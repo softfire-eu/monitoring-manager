@@ -10,15 +10,15 @@ def read(fname):
         readme_file = open(readme_file_path)
         return readme_file.read()
     else:
-        return "The SoftFIRE Security Manager"
+        return "The SoftFIRE Monitoring Manager"
 
 
 setup(
-    name="security-manager",
+    name="monitoring-manager",
     version="0.0.1",
     author="SoftFIRE",
     author_email="softfire@softfire.eu",
-    description="The SoftFIRE Security Manager",
+    description="The SoftFIRE Monitoring Manager",
     license="Apache 2",
     keywords="python vnfm nfvo open baton openbaton sdk experiment manager softfire tosca openstack rest",
     url="http://softfire.eu/",

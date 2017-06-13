@@ -5,7 +5,7 @@ from sdk.softfire.utils import *
 
 
 def openbaton_login(project_id = "761d8b56-b21a-4db2-b4d2-16b05a01bc7e") :
-    conf = get_config_parser("/etc/softfire/security-manager/security-manager.ini")
+    conf = get_config_parser("/etc/softfire/monitoring-manager/monitoring-manager.ini")
     ob_conf = conf["open-baton"]
     return OpenBatonAgentFactory(nfvo_ip=ob_conf["ip"], nfvo_port=int(ob_conf["port"]), https=(ob_conf["https"] == "True"), version=int(ob_conf["version"]), username=ob_conf["username"], password=ob_conf["password"], project_id=project_id)
 
@@ -36,7 +36,7 @@ def deploy_openbaton_nsr(project_id="761d8b56-b21a-4db2-b4d2-16b05a01bc7e", nsd_
     '''
     #TODO from conf
     '''
-    conf = get_config_parser("etc/security-manager.ini")
+    conf = get_config_parser("etc/monitoring-manager.ini")
     ob_conf = conf["open-baton"]
     agent = OpenBatonAgentFactory(nfvo_ip=ob_conf["ip"], nfvo_port=int(ob_conf["port"]), https=(ob_conf["https"] == "True"), version=int(ob_conf["version"]), username=ob_conf["username"], password=ob_conf["password"], project_id=project_id)
     '''
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             if node.type == "SecurityResource" :
                 security_nodes.append(node)
 
-    #TODO Check status of resources that the security-manager thinks to be active
+
 
     for node in security_nodes :
         node_properties = node.get_properties()

@@ -4,11 +4,11 @@ import random, string, json, time
 from org.openbaton.cli.agents.agents import OpenBatonAgentFactory
 from sdk.softfire.utils import *
 
-config_path = '/etc/softfire/security-manager/security-manager.ini'
+config_path = '/etc/softfire/monitoring-manager/monitoring-manager.ini'
 
 def get_logger(config_path):
     logging.config.fileConfig(config_path)
-    return logging.getLogger("security-manager")
+    return logging.getLogger("monitoring-manager")
 
 def random_string(size):
     return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))

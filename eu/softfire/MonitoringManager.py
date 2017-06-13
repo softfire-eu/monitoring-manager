@@ -34,12 +34,12 @@ class UpdateStatusThread(Thread):
         self.stopped = True
 
 
-class SecurityManager(AbstractManager):
+class MonitoringManager(AbstractManager):
 
     def __init__(self, config_path):
-        super(SecurityManager, self).__init__(config_path)
-        self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/security-manager")
-        self.resources_db = '%s/security-manager.db' % self.local_files_path
+        super(Monitoring, self).__init__(config_path)
+        self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
+        self.resources_db = '%s/monitoring-manager.db' % self.local_files_path
 
 
     def refresh_resources(self, user_info):
