@@ -110,17 +110,7 @@ function main {
             generate_std_users.py ${CONFIG_LOCATION}/users/
         ;;
 
-        "codeinstall")
-            rm -Rf ${CODE_LOCATION}
-            sudo mkdir ${CODE_LOCATION}
-            sudo chown -R ${USER} ${CODE_LOCATION}
-            
-            pushd /opt/softfire
-            git clone -b develop https://github.com/softfire-eu/experiment-manager.git
 
-            
-            
-        ;;
 
          
         esac

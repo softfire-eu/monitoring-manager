@@ -4,7 +4,7 @@ import random, string, json, time
 from org.openbaton.cli.agents.agents import OpenBatonAgentFactory
 from sdk.softfire.utils import *
 
-config_path = '/etc/softfire/monitoring-manager/monitoring-manager.ini'
+config_path = '/etc/softfire/monitoring-manager.ini'
 
 def get_logger(config_path):
     logging.config.fileConfig(config_path)

@@ -19,7 +19,7 @@ node_types:
     description: Defines a SDN resource request in the SoftFIRE Middleware
 
 
-  MonitoringResource:
+  MonitoringNode:
     derived_from: eu.softfire.BaseResource
     description: Defines the Zabbix monitoring resource requested
     properties:
@@ -79,7 +79,7 @@ node_types:
 topology_template:
   node_templates:
     m:
-      type: MonitoringResource
+      type: MonitoringNode
       properties:
         testbed: ericsson
         resource_id: monitor

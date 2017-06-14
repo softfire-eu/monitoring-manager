@@ -43,10 +43,11 @@ class MonitoringManager(AbstractManager):
 
 
     def refresh_resources(self, user_info):
+        logger.debug("refresh_resources")
         return None
 
     def create_user(self, username, password):
-        print("Arrivata create_user")
+        logger.debug("create_user")
         user_info = messages_pb2.UserInfo(
             name=username,
             password=password,
@@ -62,7 +63,7 @@ class MonitoringManager(AbstractManager):
         description = "This resource permits to deploy a monitor"
         cardinality = -1
         testbed = messages_pb2.ANY
-        node_type = "MonitoringResource"
+        node_type = "MonitoringNode"
         result = []
         result.append(messages_pb2.ResourceMetadata(resource_id=resource_id, description=description, cardinality=cardinality, node_type=node_type, testbed=testbed))
         return result
@@ -117,7 +118,9 @@ class MonitoringManager(AbstractManager):
     def provide_resources(self, user_info, payload=None):
         logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.debug("payload: %s" % payload)
-
+        response = []
+        return response
+        
 		#TODO REMOVE
         try :
             #TODO check param name
