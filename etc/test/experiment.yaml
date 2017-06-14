@@ -78,19 +78,8 @@ node_types:
 
 topology_template:
   node_templates:
-    f:
-      type: SecurityResource
+    m:
+      type: MonitoringResource
       properties:
-        resource_id: firewall
-        want_agent: false
         testbed: ericsson
-        default_rule: allow
-        denied_ips: [127.0.0.1]
-#    fr:
-#      type: SecurityResource
-#      properties:
-#        resource_id: firewall
-#        want_agent: true
-#        default_rule: allow
-#        denied_ips: [127.0.0.1, 172.20.30.2]
-
+        resource_id: monitor

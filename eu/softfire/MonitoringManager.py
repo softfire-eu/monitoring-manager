@@ -37,7 +37,7 @@ class UpdateStatusThread(Thread):
 class MonitoringManager(AbstractManager):
 
     def __init__(self, config_path):
-        super(Monitoring, self).__init__(config_path)
+        super(MonitoringManager, self).__init__(config_path)
         self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
         self.resources_db = '%s/monitoring-manager.db' % self.local_files_path
 
@@ -58,14 +58,11 @@ class MonitoringManager(AbstractManager):
 
     def list_resources(self, user_info=None, payload=None):
         logger.debug("List resources")
-        resource_id = "firewall"
-        description = "This resource permits to deploy a firewall. You can deploy it as a standalone VM, " \
-                      "or you can use it as an agent directly installed on the machine that you want to protect. " \
-                      "This resource offers the functionalities of UFW (https://help.ubuntu.com/community/UFW) and can be easily " \
-                      "configured by means of a Rest API.\nMore information at http://docs.softfire.eu/security-manager/"
+        resource_id = "monitor"
+        description = "This resource permits to deploy a monitor"
         cardinality = -1
         testbed = messages_pb2.ANY
-        node_type = "SecurityResource"
+        node_type = "MonitoringResource"
         result = []
         result.append(messages_pb2.ResourceMetadata(resource_id=resource_id, description=description, cardinality=cardinality, node_type=node_type, testbed=testbed))
         return result
@@ -235,14 +232,23 @@ class MonitoringManager(AbstractManager):
         return response
 
     def _update_status(self) -> dict:
-        logger.debug("Checking status update")
+        #logger.debug("Checking status update")
         result = {}
         conn = sqlite3.connect(self.resources_db)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
         query = "SELECT * FROM resources"
-        res = cur.execute(query)
+        
+        try:
+            res = cur.execute(query)
+        except:
+            logger.debug("table not found - creating it")
+            cur = conn.cursor()
+            cur.execute('''CREATE TABLE IF NOT EXISTS resources (username, project_id, nsr_id, nsd_id, random_id, log_dashboard_url)''')
+            conn.commit()
+            res = cur.execute(query)
+
         rows = res.fetchall()
         for r in rows:
             #TODO nsr_id e project_id could be empty with want_agent
