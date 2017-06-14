@@ -107,7 +107,7 @@ function main {
             copy_config_files
             download_gui
             pip3 install bottle-cork
-            python3 generate_std_users.py ${CONFIG_LOCATION}/users/
+            generate_std_users.py ${CONFIG_LOCATION}/users/
         ;;
 
         "codeinstall")

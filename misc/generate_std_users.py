@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #
 # Regenerate files in example_conf
@@ -42,19 +42,7 @@ def populate_conf_directory(out_dir):
 
     tstamp = str(datetime.utcnow())
     
-    username, password, role ='admin','admin','admin'
-    user_cork = {
-    'role': role,
-    'hash': cork._hash(username, password),
-    'email_addr': username + '@localhost.local',
-    'desc': username + ' test user',
-    'creation_date': tstamp
-    }
-    cork._store.users[username] = user_cork
-    
-    cork._store.save_users()
-    
-    username, password, role ='exp','exp','experimenter'
+    username, password, role ='root','root','experimenter'
     user_cork = {
     'role': role,
     'hash': cork._hash(username, password),
