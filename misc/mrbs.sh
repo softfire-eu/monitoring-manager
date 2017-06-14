@@ -8,19 +8,19 @@ for arg in "$@"; do
 done
 
 BASE_URL="https://github.com/softfire-eu/"
-MANAGERS="experiment-manager nfv-manager physical-device-manager sdn-manager"
+MANAGERS="experiment-manager"
 VENV_NAME="$HOME/.softfire"
 SESSION_NAME="softfire"
 CODE_LOCATION="/opt/softfire"
 CONFIG_LOCATION="/etc/softfire"
 CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
-https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/nfv-manager.ini \
-https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/available-nsds.json"
+https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
+CONFIG_FILE_USERS_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
+https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
 
 function install_requirements {
     sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password root'
     sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password root'
-    sudo apt-get update
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --force-yes virtualenv git tmux mysql-server python3-pip build-essential libmysqlclient-dev libssl-dev libffi-dev python-dev
 }
 
@@ -51,7 +51,7 @@ function usage {
 }
 
 function create_folders {
-for dir in ${CONFIG_LOCATION} "/var/log/softfire" "${CONFIG_LOCATION}/users"; do
+for dir in ${CONFIG_LOCATION} "/var/log/softfire" "${CONFIG_LOCATION}/users" "${CONFIG_LOCATION}/monitoring-manager"; do
     if [ ! -d ${dir} ]; then
         sudo mkdir -p ${dir}
         sudo chown ${USER} ${dir}
@@ -83,24 +83,10 @@ function copy_config_files {
     done
 
     popd
+    
 }
 
-function remove_venv {
-    rm -rf ${VENV_NAME}
-}
 
-function remove_databases {
-    # Works only for sqlite!
-    db_location=$(awk -F ":///" '/^url/ {print $2}' /etc/softfire/experiment-manager.ini)
-    rm -rf ${db_location}
-    db_location=$(awk -F ":///" '/^url/ {print $2}' /etc/softfire/nfv-manager.ini)
-    rm -rf ${db_location}
-
-    echo -n Mysql root Password:
-    read -s mysql_password
-    echo
-    mysql -u root -p${mysql_password} -e "drop database if exists softfire;"
-}
 
 function main {
 
@@ -114,143 +100,29 @@ function main {
     for var in "$@";
     do
         case ${var} in
-        "setupenv")
+        "setup")
 
             install_requirements
             create_folders
-            #pip3 install bottle-cork
-            #python3 generate_cork_files.py "${CONFIG_LOCATION}/users/"
-
             copy_config_files
-
             download_gui
-           ;;
+            pip3 install bottle-cork
+            python3 generate_std_users.py ${CONFIG_LOCATION}/users/
+        ;;
 
-         "start")
-            tmux new -d -s ${SESSION_NAME}
-
-            for m in ${MANAGERS}; do
-                echo "Starting ${m}"
-                tmux neww -t ${SESSION_NAME} -n "${m}" "source $VENV_NAME/bin/activate && ${m}"
-                sleep 2
-            done
-
-
-         ;;
-        "install")
-
-            install_requirements
-            create_folders
-            enable_virtualenv
-
-            for m in ${MANAGERS}; do
-                install_manager ${m}
-            done
-
-            python generate_cork_files.py "${CONFIG_LOCATION}/users/"
-
-            copy_config_files
-
-            download_gui
-           ;;
-
-         "start")
-            tmux new -d -s ${SESSION_NAME}
-
-            for m in ${MANAGERS}; do
-                echo "Starting ${m}"
-                tmux neww -t ${SESSION_NAME} -n "${m}" "source $VENV_NAME/bin/activate && ${m}"
-                sleep 2
-            done
-
-
-         ;;
-         "clean")
-            echo -n Mysql root Password:
-            read -s mysql_password
-            echo
-
-            mysql -u root -p${mysql_password} -e "drop database if exists softfire; create database softfire;"
-
-            python generate_cork_files.py
-         ;;
-         "update")
-            enable_virtualenv
-
-            for m in ${MANAGERS}; do
-                install_manager ${m} "--upgrade"
-            done
-
-            download_gui
-         ;;
-         "codeupdate")
-             pushd ${CODE_LOCATION}
-
-             for x in `ls`; do
-                pushd $x && git checkout . && git pull && popd;
-             done
-             popd
-             download_gui
-         ;;
-         "codeinstall")
+        "codeinstall")
             rm -Rf ${CODE_LOCATION}
-            if [ ! -d ${CODE_LOCATION} ]; then
-                sudo mkdir ${CODE_LOCATION}
-                sudo chown -R ${USER} ${CODE_LOCATION}
-            else
-                echo "Folder '/opt/softfire' exists already, delete it before code install"
-                exit 1
-            fi
-
+            sudo mkdir ${CODE_LOCATION}
+            sudo chown -R ${USER} ${CODE_LOCATION}
+            
             pushd /opt/softfire
-            for m in ${MANAGERS}; do
-                git clone "${BASE_URL}${m}.git"
-            done
+            git clone -b develop https://github.com/softfire-eu/experiment-manager.git
 
-         ;;
-         "codestart")
+            
+            
+        ;;
 
-            enable_virtualenv
-            for m in ${MANAGERS}; do
-                pip uninstall ${m} -y
-            done
-            deactivate
-
-            tmux new -d -s ${SESSION_NAME}
-
-            for m in ${MANAGERS}; do
-                echo "Starting ${m}"
-                tmux neww -t ${SESSION_NAME} -n "${m}" "source $VENV_NAME/bin/activate && cd ${CODE_LOCATION}/${m} && ./${m}"
-                sleep 2
-            done
-         ;;
-
-         "stop")
-            tmux kill-session -t ${SESSION_NAME}
-         ;;
-
-         "clean")
-            remove_venv
-         ;;
-
-         "purge")
-            read -p "Are you sure you want to purge all (y/n)?" choice
-            case "$choice" in
-              y|Y )
-                remove_venv
-                rm -rf ${CODE_LOCATION}
-                # remove_databases
-                echo "To complete the purging, delete the folder ${CONFIG_LOCATION}"
-                ;;
-              n|N )
-                echo "ah ok..."
-                ;;
-              * )
-                echo "invalid choice"
-                ;;
-            esac
-
-         ;;
+         
         esac
 
     done

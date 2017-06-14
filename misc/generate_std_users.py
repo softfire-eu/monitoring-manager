@@ -50,7 +50,10 @@ def populate_conf_directory(out_dir):
     'desc': username + ' test user',
     'creation_date': tstamp
     }
-
+    cork._store.users[username] = user_cork
+    
+    cork._store.save_users()
+    
     username, password, role ='exp','exp','experimenter'
     user_cork = {
     'role': role,
@@ -59,6 +62,8 @@ def populate_conf_directory(out_dir):
     'desc': username + ' test user',
     'creation_date': tstamp
     }
+    
+    cork._store.users[username] = user_cork
 
     cork._store.save_users()
 
