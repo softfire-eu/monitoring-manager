@@ -9,11 +9,6 @@ import sqlite3, requests, tarfile, shutil
 from threading import Thread
 
 logger = get_logger(config_path)
-ip_lists = ["allowed_ips", "denied_ips"]
-
-def add_rule_to_fw(fd, rule) :
-    fd.write("curl -X POST -H \"Content-Type: text/plain\" -d '%s' http://localhost:5000/ufw/rules\n" % rule)
-
 
 class UpdateStatusThread(Thread):
     def __init__(self, manager):
@@ -37,16 +32,24 @@ class UpdateStatusThread(Thread):
 class MonitoringManager(AbstractManager):
 
     def __init__(self, config_path):
+        logger.debug("MROSSI:__init__")
         super(MonitoringManager, self).__init__(config_path)
         self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
         self.resources_db = '%s/monitoring-manager.db' % self.local_files_path
-
-
+        os.environ["OS_USERNAME"]               = self.get_config_value("openstack-env", "OS_USERNAME", "")
+        os.environ["OS_PASSWORD"]               = self.get_config_value("openstack-env", "OS_PASSWORD", "")
+        os.environ["OS_AUTH_URL"]               = self.get_config_value("openstack-env", "OS_AUTH_URL", "")
+        os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
+        os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
+        logger.debug(os.environ)
+        
     def refresh_resources(self, user_info):
+        logger.debug("MROSSI:refresh_resources")
         logger.debug("refresh_resources")
         return None
 
     def create_user(self, username, password):
+        logger.debug("MROSSI:create_user")
         logger.debug("create_user")
         user_info = messages_pb2.UserInfo(
             name=username,
@@ -58,18 +61,19 @@ class MonitoringManager(AbstractManager):
         return user_info
 
     def list_resources(self, user_info=None, payload=None):
+        logger.debug("MROSSI:list_resources")
         logger.debug("List resources")
         resource_id = "monitor"
-        description = "This resource permits to deploy a monitor"
-        cardinality = -1
+        description = "This resource permits to deploy a ZabbixServer"
+        cardinality = 1
         testbed = messages_pb2.ANY
-        node_type = "MonitoringNode"
+        node_type = "MonitoringResource"
         result = []
         result.append(messages_pb2.ResourceMetadata(resource_id=resource_id, description=description, cardinality=cardinality, node_type=node_type, testbed=testbed))
         return result
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-
+        logger.debug("MROSSI:validate_resources")
         resource = yaml.load(payload)
         logger.debug("Validating resource %s" % resource)
         '''
@@ -116,6 +120,7 @@ class MonitoringManager(AbstractManager):
             return
 
     def provide_resources(self, user_info, payload=None):
+        logger.debug("MROSSI:provide_resources")
         logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.debug("payload: %s" % payload)
         response = []
@@ -235,6 +240,7 @@ class MonitoringManager(AbstractManager):
         return response
 
     def _update_status(self) -> dict:
+        logger.debug("MROSSI:_update_status")
         #logger.debug("Checking status update")
         result = {}
         conn = sqlite3.connect(self.resources_db)
@@ -308,6 +314,7 @@ class MonitoringManager(AbstractManager):
 
 
     def release_resources(self, user_info, payload=None):
+        logger.debug("MROSSI:release_resources")
         logger.info("Requested release_resources by user %s" % user_info.name)
         logger.debug("Arrived release_resources\nPayload: %s" % payload)
 

@@ -15,14 +15,19 @@ CODE_LOCATION="/opt/softfire"
 CONFIG_LOCATION="/etc/softfire"
 CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
 https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
-CONFIG_FILE_USERS_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
+CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
+https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/nfv-manager.ini \
+https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/available-nsds.json \
+https://raw.githubusercontent.com/softfire-eu/experiment-manager/develop/etc/mapping-managers.json \
+https://github.com/softfire-eu/nfv-manager/raw/master/etc/openstack-credentials.json \
 https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
 
 function install_requirements {
-    sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password root'
-    sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password root'
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --force-yes virtualenv git tmux mysql-server python3-pip build-essential libmysqlclient-dev libssl-dev libffi-dev python-dev
+
+	sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --force-yes virtualenv git tmux python3-pip build-essential libmysqlclient-dev libssl-dev libffi-dev python3-dev openvpn
+
 }
+
 
 function install_manager() {
     manager_name=$1
@@ -45,7 +50,7 @@ function enable_virtualenv {
 function usage {
     echo "$0 <action>"
     echo ""
-    echo "actions:    [install|update|clean|start|codestart|codeupdate|codeinstall|clean|purge]"
+    echo "actions:    [setup]"
     exit 1
 
 }
@@ -105,9 +110,11 @@ function main {
             install_requirements
             create_folders
             copy_config_files
+            rm /etc/softfire/monitoring-manager.ini
+            ln -s /root/git/monitoring-manager/etc/monitoring-manager.ini /etc/softfire/monitoring-manager.ini
             download_gui
             pip3 install bottle-cork
-            generate_std_users.py ${CONFIG_LOCATION}/users/
+            python3 ~/git/monitoring-manager/misc/generate_std_users.py ${CONFIG_LOCATION}/users/
         ;;
 
 

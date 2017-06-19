@@ -15,7 +15,7 @@ from concurrent.futures import ProcessPoolExecutor
 from eu.softfire.utils.utils import config_path
 
 def start():
-    os.environ["http_proxy"] = ""
+    #os.environ["http_proxy"] = "http://"
     #print(os.environ["http_proxy"])
     #print(os.environ["no_proxy"])
     #mon_manager = MonitoringManager(get_logger("eu.softfire.monitoring-manager"))
