@@ -1,12 +1,15 @@
 from sdk.softfire.manager import AbstractManager
 from sdk.softfire.grpc import messages_pb2
-from eu.softfire.utils.utils import get_logger
 from IPy import IP
 from eu.softfire.utils.utils import *
 from eu.softfire.exceptions.exceptions import *
 import yaml, os
 import sqlite3, requests, tarfile, shutil
 from threading import Thread
+
+
+
+
 
 logger = get_logger(config_path)
 
@@ -41,7 +44,12 @@ class MonitoringManager(AbstractManager):
         os.environ["OS_AUTH_URL"]               = self.get_config_value("openstack-env", "OS_AUTH_URL", "")
         os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
         os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
-        logger.debug(os.environ)
+        #logger.debug(os.environ)
+        import novaclient.client as nvclient
+        creds = get_nova_creds()
+        nova = nvclient.Client(**creds)
+        sL = nova.servers.list()
+        logger.debug(sL)
         
     def refresh_resources(self, user_info):
         logger.debug("MROSSI:refresh_resources")
