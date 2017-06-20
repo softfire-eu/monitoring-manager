@@ -45,11 +45,20 @@ class MonitoringManager(AbstractManager):
         os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
         os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
         #logger.debug(os.environ)
-        import novaclient.client as nvclient
-        creds = get_nova_creds()
-        nova = nvclient.Client(**creds)
-        sL = nova.servers.list()
-        logger.debug(sL)
+        from keystoneauth1 import loading
+        from keystoneauth1 import session
+        from novaclient import client
+        loader = loading.get_plugin_loader('password')
+        auth = loader.load_from_options(auth_url=os.environ["OS_AUTH_URL"],
+                                        username=os.environ["OS_USERNAME"],
+                                        password=os.environ["OS_PASSWORD"],
+                                        tenant_name=os.environ["OS_TENANT_NAME"]
+                                        )
+        sess = session.Session(auth=auth)
+        nova = client.Client(os.environ["OS_IDENTITY_API_VERSION"], session=sess)
+        sl = nova.servers.list()
+        logger.debug(sl)
+        
         
     def refresh_resources(self, user_info):
         logger.debug("MROSSI:refresh_resources")
