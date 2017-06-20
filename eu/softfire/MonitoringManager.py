@@ -48,16 +48,15 @@ class MonitoringManager(AbstractManager):
         from keystoneauth1 import loading
         from keystoneauth1 import session
         from novaclient import client
-        loader = loading.get_plugin_loader('password')
-        auth = loader.load_from_options(auth_url=os.environ["OS_AUTH_URL"],
+        self.OSloader = loading.get_plugin_loader('password')
+        self.OSauth = self.OSloader.load_from_options(auth_url=os.environ["OS_AUTH_URL"],
                                         username=os.environ["OS_USERNAME"],
                                         password=os.environ["OS_PASSWORD"],
                                         tenant_name=os.environ["OS_TENANT_NAME"]
                                         )
-        sess = session.Session(auth=auth)
-        nova = client.Client(os.environ["OS_IDENTITY_API_VERSION"], session=sess)
-        sl = nova.servers.list()
-        logger.debug(sl)
+        self.OSsession = session.Session(auth=self.OSauth)
+        self.OSnova = client.Client(os.environ["OS_IDENTITY_API_VERSION"], session=self.OSsession)
+        
         
         
     def refresh_resources(self, user_info):
@@ -258,6 +257,10 @@ class MonitoringManager(AbstractManager):
 
     def _update_status(self) -> dict:
         logger.debug("MROSSI:_update_status")
+        sl = self.OSnova.servers.list()
+        for s in sl:
+            logger.debug("{} {} {}".format(s.name,s.status,s.networks))
+        
         #logger.debug("Checking status update")
         result = {}
         conn = sqlite3.connect(self.resources_db)
