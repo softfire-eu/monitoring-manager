@@ -39,12 +39,31 @@ class MonitoringManager(AbstractManager):
         super(MonitoringManager, self).__init__(config_path)
         self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
         self.resources_db = '%s/monitoring-manager.db' % self.local_files_path
+        
+        conn = sqlite3.connect(self.resources_db)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        query = "SELECT * FROM resources"
+        
+        try:
+            res = cur.execute(query)
+        except:
+            logger.debug("table not found - creating it")
+            cur = conn.cursor()
+            cur.execute('''CREATE TABLE IF NOT EXISTS resources (username, project_id, nsr_id, nsd_id, random_id, log_dashboard_url)''')
+            conn.commit()
+        finally:
+            conn.close()
+            
         os.environ["OS_USERNAME"]               = self.get_config_value("openstack-env", "OS_USERNAME", "")
         os.environ["OS_PASSWORD"]               = self.get_config_value("openstack-env", "OS_PASSWORD", "")
         os.environ["OS_AUTH_URL"]               = self.get_config_value("openstack-env", "OS_AUTH_URL", "")
         os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
         os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
+        
         #logger.debug(os.environ)
+        
         from keystoneauth1 import loading
         from keystoneauth1 import session
         from novaclient import client
@@ -54,10 +73,14 @@ class MonitoringManager(AbstractManager):
                                         password=os.environ["OS_PASSWORD"],
                                         tenant_name=os.environ["OS_TENANT_NAME"]
                                         )
+        
         self.OSsession = session.Session(auth=self.OSauth)
         self.OSnova = client.Client(os.environ["OS_IDENTITY_API_VERSION"], session=self.OSsession)
         
-        
+        self.ZabbixServerName=self.get_config_value("openstack-params", "instance_name", "")
+        self.ZabbixServerFloatingIp=self.get_config_value("openstack-params", "floating_ip", "")
+        self.ZabbixInternalStatus="NONE" #NONE, FLOATING, ACTIVE
+        self.JobInternalStatus="NONE" #NONE, TOCREATE, TODELETE
         
     def refresh_resources(self, user_info):
         logger.debug("MROSSI:refresh_resources")
@@ -89,155 +112,23 @@ class MonitoringManager(AbstractManager):
         return result
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-        logger.debug("MROSSI:validate_resources")
+        logger.info("Requested validate_resources by user %s" % user_info.name)
         resource = yaml.load(payload)
         logger.debug("Validating resource %s" % resource)
-        '''
-        :param payload: yaml string containing the resource definition
-        '''
-        print(user_info)
-        properties = resource["properties"]
-
-        if properties["resource_id"] == "firewall" :
-            '''Required properties are already defined in the template'''
-
-            '''Check default_rule value'''
-            if properties["default_rule"] == "allow" or properties["default_rule"] == "deny":
-                pass
-            else :
-                message = "default_rule does not contain a valid value"
-                logger.info(message)
-                # TODO send error to experiment-manager
-                raise ResourceValidationError(message=message)
-
-
-            '''Check syntax'''
-            for ip_list in ip_lists :
-                if (ip_list in properties) :
-                    for ip in properties[ip_list]:
-                        #print(ip)
-                        try :
-                            IP(ip)
-                        except ValueError :
-                            message = "%s contains invalid values" % ip_list
-                            logger.info(message)
-                            raise ResourceValidationError(message=message)
-
-            '''Check testbed vale'''
-            testbeds = ["fokus", "ericsson", "ads", "dt"]
-            if (not properties["want_agent"]) and (not properties["testbed"] in testbeds) :
-                message = "testbed does not contain a valid value"
-                logger.info(message)
-                raise ResourceValidationError(message=message)
-
-            ####### for test ######
-            #self.provide_resources(user_info, payload)
-            ######################
-            return
+        logger.debug("user_info        %s" % user_info)
+        self.JobInternalStatus = "TOCREATE"
 
     def provide_resources(self, user_info, payload=None):
         logger.debug("MROSSI:provide_resources")
         logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.debug("payload: %s" % payload)
+        
+        
+        
         response = []
         return response
         
-		#TODO REMOVE
-        try :
-            #TODO check param name
-            project_id = user_info.project_id
-        except Exception :
-            project_id = "761d8b56-b21a-4db2-b4d2-16b05a01bc7e"
-			# Hardcoded to test interacion with Open baton. Should be sent by the experiment-manager
-
-        logger.info("Requested provide_resources by user %s" % user_info.name)
-
-        nsr_id = ""
-        log_dashboard_url = ""
-
-        random_id = random_string(6)
-        tmp_files_path = "%s/tmp/%s" % (self.local_files_path, random_id)
-        logger.debug("Store tmp files in folder %s" %tmp_files_path)
-        os.makedirs(tmp_files_path)
-
-        resource = yaml.load(payload)
-        properties = resource["properties"]
-
-        '''Download scripts from remote Repository'''
-        scripts_url = "%s/%s.tar" % (self.get_config_value("remote-files", "url"), properties["resource_id"])
-        tar_filename = "%s/%s.tar" % (tmp_files_path, properties["resource_id"])
-
-
-        r = requests.get(scripts_url, stream=True)
-        with open(tar_filename, 'wb') as fd:
-            for chunk in r.iter_content(chunk_size=128):
-                fd.write(chunk)
-
-        tar = tarfile.open(name=tar_filename, mode="r")
-        tar.extractall(path=tmp_files_path)
-        tar.close()
-
-        response = []
-        if properties["resource_id"] == "firewall" :
-
-            '''Modify scripts with custom configuration'''
-            ufw_script = "%s/scripts/ufw.sh" % tmp_files_path
-            with open(ufw_script, "a") as fd:
-                '''Set default rule'''
-                add_rule_to_fw(fd, "default %s" % properties["default_rule"])
-
-                '''Set rules for list of IPs'''
-                for ip_list in ip_lists :
-                    if ip_list in properties:
-                        for ip in properties[ip_list]:
-                            if ip_list == "allowed_ips" :
-
-                                rule = "allow from %s" % ip
-                            else :
-                                rule = "deny from %s" % ip
-                            add_rule_to_fw(fd, rule)
-
-                #if properties["logging"] == "True" :
-                    '''Configure logging to send log messages to <collector_ip>'''
-                    index = ""
-                    collector_ip = ""
-                    log_dashboard_url = ""
-
-            tar = tarfile.open(name=tar_filename, mode='w')
-
-            if properties["want_agent"]  :
-                '''Prepare .tar with custom scripts'''
-
-                tar.add('%s/scripts' % tmp_files_path, arcname='')
-                tar.close()
-                #TODO send link to the user to download her scripts
-            else :
-                #TODO add testbed to descriptor & change name/version to avoid conflicts
-                vnfd = {}
-                with open("%s/vnfd.json" % tmp_files_path, "r") as fd :
-                    vnfd = json.loads(fd.read())
-                logger.debug(vnfd)
-                vnfd["name"] +=  ("-%s" % random_id)
-                vnfd["type"] = vnfd["name"]
-                logger.debug(vnfd["name"])
-                logger.debug("Prepared VNFD: %s" % vnfd)
-                with open("%s/vnfd.json" % tmp_files_path, "w") as fd:
-                    fd.write(json.dumps(vnfd))
-                '''Prepare VNFPackage'''
-                tar.add('%s' % tmp_files_path, arcname='')
-                tar.close()
-                # TODO deploy VM on the specified testbed and send back IP address
-                #try :
-                nsr_details = json.loads(deploy_package(path=tar_filename, project_id=project_id))
-                nsr_id = nsr_details["id"]
-                nsd_id = nsr_details["descriptor_reference"]
-
-
-                response.append(json.dumps(nsr_details))
-                #except Exception as e :
-                    #TODO Fix
-                    #logger.error(e)
-
+		
         # TODO store reference between resource and user. ADD status, api-ip, dashboard_url
         conn = sqlite3.connect(self.resources_db)
         cur = conn.cursor()
@@ -257,11 +148,34 @@ class MonitoringManager(AbstractManager):
 
     def _update_status(self) -> dict:
         logger.debug("MROSSI:_update_status")
+        self.ZabbixServerInstance=None
+        self.ZabbixServerIpAttached=False
+        
         sl = self.OSnova.servers.list()
         for s in sl:
-            logger.debug("{} {} {}".format(s.name,s.status,s.networks))
+            if s.name==self.ZabbixServerName:
+                self.ZabbixServerInstance=s
+                for n in self.ZabbixServerInstance.networks.keys():
+                    for ip in self.ZabbixServerInstance.networks[n]:                    
+                        if str(ip)==self.ZabbixServerFloatingIp:
+                            self.ZabbixServerIpAttached=True
+                break
         
+        if self.ZabbixServerInstance:
+            if self.ZabbixServerIpAttached:
+                self.ZabbixInternalStatus="ACTIVE"
+            else:
+                self.ZabbixInternalStatus="FLOATING"       
+        else:
+                self.ZabbixInternalStatus="NONE"
+        
+        
+        logger.info("ZabbixServerStatus {:>10}   JobStatus {:>10}".format(self.ZabbixInternalStatus,self.JobInternalStatus) )
+                    
         #logger.debug("Checking status update")
+        
+        self.JobInternalStatus = "NONE"
+        
         result = {}
         conn = sqlite3.connect(self.resources_db)
         conn.row_factory = sqlite3.Row
@@ -269,15 +183,8 @@ class MonitoringManager(AbstractManager):
 
         query = "SELECT * FROM resources"
         
-        try:
-            res = cur.execute(query)
-        except:
-            logger.debug("table not found - creating it")
-            cur = conn.cursor()
-            cur.execute('''CREATE TABLE IF NOT EXISTS resources (username, project_id, nsr_id, nsd_id, random_id, log_dashboard_url)''')
-            conn.commit()
-            res = cur.execute(query)
-
+        res = cur.execute(query)
+        
         rows = res.fetchall()
         for r in rows:
             #TODO nsr_id e project_id could be empty with want_agent
@@ -334,7 +241,6 @@ class MonitoringManager(AbstractManager):
 
 
     def release_resources(self, user_info, payload=None):
-        logger.debug("MROSSI:release_resources")
         logger.info("Requested release_resources by user %s" % user_info.name)
         logger.debug("Arrived release_resources\nPayload: %s" % payload)
 
@@ -356,4 +262,7 @@ class MonitoringManager(AbstractManager):
         conn.close()
 
         #TODO delete folders
+        
+        
+        self.JobInternalStatus = "TODELETE"
         return
