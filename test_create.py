@@ -1,4 +1,4 @@
-import configparser,os
+import configparser,os,time
 
 config = configparser.ConfigParser()
 #config.read('git/monitoring-manager/etc/monitoring-manager.ini')
@@ -15,6 +15,24 @@ auth = loader.load_from_options(auth_url=config['openstack-env']['OS_AUTH_URL'],
 sess = session.Session(auth=auth)
 nova = client.Client(config['openstack-env']['OS_IDENTITY_API_VERSION'], session=sess)
 
-sl = nova.servers.list()
-for s in sl:
-   print (s,s.status,s.networks)
+
+serv = nova.servers.create(
+                    name=config['openstack-params']['instance_name'], 
+                    image=nova.glance.find_image(config['openstack-params']['image_name']), 
+                    flavor=nova.flavors.find(name=config['openstack-params']['flavour']), 
+                    nics=[{'net-id': nova.neutron.find_network(config['openstack-params']['network']).id}],
+                    security_groups=[config['openstack-params']['security_group']],
+                    )
+
+id=serv.id
+
+while 1:
+    serv=nova.servers.get(id)
+    status=serv.status
+    print (status)
+    if status!="BUILD":
+        break
+    time.sleep(0.3)
+
+serv.add_floating_ip(config['openstack-params']['floating_ip'])
+
