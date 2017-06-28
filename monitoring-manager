@@ -12,7 +12,7 @@ from eu.softfire.MonitoringManager import MonitoringManager, UpdateStatusThread
 import asyncio
 import os
 from concurrent.futures import ProcessPoolExecutor
-from eu.softfire.utils.utils import config_path
+from eu.softfire.utils.monitoring.utils import config_path
 
 def start():
     #os.environ["http_proxy"] = "http://"

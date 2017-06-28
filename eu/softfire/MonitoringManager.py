@@ -1,10 +1,12 @@
 from sdk.softfire.manager import AbstractManager
 from sdk.softfire.grpc import messages_pb2
-from IPy import IP
-from eu.softfire.utils.utils import *
-from eu.softfire.exceptions.exceptions import *
+
+from eu.softfire.utils.monitoring.utils import *
+from eu.softfire.exceptions.monitoring.exceptions import *
+
 import yaml, os
-import sqlite3, requests, tarfile, shutil
+import requests
+
 from threading import Thread
 
 logger = get_logger(config_path)
@@ -107,13 +109,12 @@ class MonitoringManager(AbstractManager):
         self.ZabbixServerUserCreator = user_info.name
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TOCREATE"
-    
+            
     def release_resources(self, user_info, payload=None):
         logger.info("Requested release_resources by user |%s| - Payload %s" % (user_info.name,payload))
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TODELETE"
-        return
-
+            
     def _update_status(self) -> dict:
         
         self.updating = True

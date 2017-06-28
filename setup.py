@@ -32,7 +32,6 @@ setup(
         'softfire-sdk',
         'tosca-parser', #probably not needed
         'pyyaml',
-        'IPy',
         'requests',
         'pbr==3.1.1',
         'oslo.utils==3.26.0',
