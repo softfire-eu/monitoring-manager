@@ -99,11 +99,12 @@ class MonitoringManager(AbstractManager):
     def validate_resources(self, user_info=None, payload=None) -> None:
         logger.info("Requested validate_resources by user %s\n Payload %s" % (user_info.name,payload))
         resource = yaml.load(payload)
-        self.JobInternalStatus = "TOCREATE"
+        if self.JobInternalStatus == "NONE":
+            self.JobInternalStatus = "TOCREATE"
     
     def release_resources(self, user_info, payload=None):
         logger.info("Requested release_resources by user %s\n Payload %s" % (user_info.name,payload))
-        if self.JobInternalStatus != "NONE":
+        if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TODELETE"
         return
 
@@ -153,7 +154,6 @@ class MonitoringManager(AbstractManager):
             
             NewServer.add_floating_ip(self.ZabbixServerFloatingIp)
             self.ZabbixServerInstance = NewServer
-            
             self.expDeployed = True
 
         if self.JobInternalStatus == "TODELETE":
@@ -177,6 +177,7 @@ class MonitoringManager(AbstractManager):
         result["root"] = []
         result["root"].append(json.dumps(s))
         if self.expDeployed:
+            print(result)
             return result
         else:
             return {}
