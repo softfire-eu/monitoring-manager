@@ -15,16 +15,18 @@ def read(fname):
 
 setup(
     name="monitoring-manager",
-    version="0.0.1",
+    version="0.1.0",
     author="SoftFIRE",
     author_email="softfire@softfire.eu",
     description="The SoftFIRE Monitoring Manager",
     license="Apache 2",
-    keywords="python vnfm nfvo open baton openbaton sdk experiment manager softfire tosca openstack rest",
+    keywords="python vnfm nfvo sdk experiment manager softfire tosca openstack rest",
     url="http://softfire.eu/",
     packages=find_packages(),
     scripts=["monitoring-manager"],
     install_requires=[
+        'bottle==0.12.13',
+        'bottle-cork',
         'asyncio',
         'grpcio',
         'softfire-sdk',
@@ -32,7 +34,14 @@ setup(
         'pyyaml',
         'IPy',
         'requests',
-        'bottle'
+        'pbr==3.1.1',
+        'oslo.utils==3.26.0',
+        'oslo.i18n==3.15.3',
+        'oslo.serialization==1.10.0',
+        'keystoneauth1==2.21.0',
+        'debtcollector==1.15.0',
+        'stevedore==1.23.0',
+        'python-novaclient',
     ],
     long_description=read('README.rst'),
     classifiers=[

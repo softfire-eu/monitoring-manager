@@ -13,14 +13,7 @@ VENV_NAME="$HOME/.softfire"
 SESSION_NAME="softfire"
 CODE_LOCATION="/opt/softfire"
 CONFIG_LOCATION="/etc/softfire"
-CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
-https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
-CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini \
-https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/nfv-manager.ini \
-https://raw.githubusercontent.com/softfire-eu/nfv-manager/master/etc/available-nsds.json \
-https://raw.githubusercontent.com/softfire-eu/experiment-manager/develop/etc/mapping-managers.json \
-https://github.com/softfire-eu/nfv-manager/raw/master/etc/openstack-credentials.json \
-https://raw.githubusercontent.com/softfire-eu/monitoring-manager/master/etc/monitoring-manager.ini"
+CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini"
 
 function install_requirements {
 
@@ -110,10 +103,8 @@ function main {
             install_requirements
             create_folders
             copy_config_files
-            rm /etc/softfire/monitoring-manager.ini
             ln -s /root/git/monitoring-manager/etc/monitoring-manager.ini /etc/softfire/monitoring-manager.ini
             download_gui
-            pip3 install bottle-cork
             python3 ~/git/monitoring-manager/misc/generate_std_users.py ${CONFIG_LOCATION}/users/
         ;;
 

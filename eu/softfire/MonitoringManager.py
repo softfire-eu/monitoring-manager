@@ -63,7 +63,8 @@ class MonitoringManager(AbstractManager):
         
         self.ZabbixInternalStatus="NONE" #NONE, FLOATING, ACTIVE
         self.JobInternalStatus="NONE" #NONE, TOCREATE, TODELETE
-        self.ZabbixServerInternaIp=None
+        self.ZabbixServerInternalIp=None
+        self.ZabbixServerCurrentFloatingIp=None
         self.ZabbixServerUserCreator=None
         self.expDeployed=False
         
@@ -77,7 +78,6 @@ class MonitoringManager(AbstractManager):
             ob_project_id='id',
             testbed_tenants={}
         )
-        print(user_info)
         return user_info
         
     def refresh_resources(self, user_info):
@@ -102,14 +102,14 @@ class MonitoringManager(AbstractManager):
         return response
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-        logger.info("Requested validate_resources by user %s\n Payload %s" % (user_info.name,payload))
+        logger.info("Requested validate_resources by user |%s| - Payload %s" % (user_info.name,payload.replace('\r',' ').replace('\n',' ')))
         resource = yaml.load(payload)
         self.ZabbixServerUserCreator = user_info.name
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TOCREATE"
     
     def release_resources(self, user_info, payload=None):
-        logger.info("Requested release_resources by user %s\n Payload %s" % (user_info.name,payload))
+        logger.info("Requested release_resources by user |%s| - Payload %s" % (user_info.name,payload))
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TODELETE"
         return
@@ -118,29 +118,21 @@ class MonitoringManager(AbstractManager):
         
         self.updating = True
         
-        self.ZabbixServerInstance=None
-        self.ZabbixServerIpAttached=False
-        
-        for s in self.OSnova.servers.list():
-            if s.name==self.ZabbixServerName:
-                self.ZabbixServerInstance=s
-                for n in self.ZabbixServerInstance.networks.keys():
-                    for ip in self.ZabbixServerInstance.networks[n]:                    
-                        if str(ip)==self.ZabbixServerFloatingIp:
-                            self.ZabbixServerIpAttached=True
-                        else:
-                            self.ZabbixServerInternaIp=ip
-                break
-        
-        if self.ZabbixServerInstance:
-            if self.ZabbixServerIpAttached:
-                self.ZabbixInternalStatus="ACTIVE"
-            else:
-                self.ZabbixInternalStatus="FLOATING"       
-        else:
+        if self.JobInternalStatus == "TODELETE":
+            self.JobInternalStatus = "NONE"
+            for s in self.OSnova.servers.list():
+                if s.name==self.ZabbixServerName:
+                    self.ZabbixServerInstance=s
+                    break
+            if self.ZabbixServerInstance:
+                self.ZabbixServerInstance.delete()
+                self.ZabbixServerInstance=None
+                self.ZabbixServerInternalIp=None
+                self.ZabbixServerCurrentFloatingIp=None
                 self.ZabbixInternalStatus="NONE"
-        
-        logger.info("ZabbixServerStatus {:>10}   JobStatus {:>10}".format(self.ZabbixInternalStatus,self.JobInternalStatus) )
+            self.expDeployed = False
+            self.updating = False
+            return {}
         
         if self.JobInternalStatus == "TOCREATE":
             self.JobInternalStatus = "NONE"
@@ -163,19 +155,39 @@ class MonitoringManager(AbstractManager):
             NewServer.add_floating_ip(self.ZabbixServerFloatingIp)
             self.ZabbixServerInstance = NewServer
             self.expDeployed = True
+        
+        else:
+            self.ZabbixServerInstance=None
+            self.ZabbixServerIpAttached=False        
+            for s in self.OSnova.servers.list():
+                if s.name==self.ZabbixServerName:
+                    self.ZabbixServerInstance=s
+                    break
+        
+        if self.ZabbixServerInstance:
 
-        if self.JobInternalStatus == "TODELETE":
-            self.JobInternalStatus = "NONE"
-            if self.ZabbixServerInstance:
-                self.ZabbixServerInstance.delete()
-                self.ZabbixServerInstance=None
-                self.ZabbixServerInternaIp=None
+            for n in self.ZabbixServerInstance.networks.keys():
+                for ip in self.ZabbixServerInstance.networks[n]:                    
+                    if str(ip)==self.ZabbixServerFloatingIp:
+                        self.ZabbixServerIpAttached=True
+                    else:
+                        self.ZabbixServerInternalIp=ip
+                break
+
+            if self.ZabbixServerIpAttached:
+                self.ZabbixInternalStatus="ACTIVE"
+                self.ZabbixServerCurrentFloatingIp=self.ZabbixServerFloatingIp
+            else:
+                self.ZabbixInternalStatus="FLOATING"   
+                self.ZabbixServerCurrentFloatingIp="---------"   
+                
+        else:
                 self.ZabbixInternalStatus="NONE"
-            self.expDeployed = False
- 
+
         if self.ZabbixServerInstance is None:
             self.expDeployed = False
-            
+        
+        logger.info("ZabbixServerStatus {:>10}   JobStatus {:>10}".format(self.ZabbixInternalStatus,self.JobInternalStatus) )
         
         self.updating = False
         
@@ -185,11 +197,14 @@ class MonitoringManager(AbstractManager):
             s = {}
             
             s["status"] = self.ZabbixInternalStatus
-            s["internalIp"] = self.ZabbixServerInternaIp
+            s["internalIp"] = self.ZabbixServerInternalIp
+            s["floatingIpIp"] = self.ZabbixServerCurrentFloatingIp
             
-            result[self.ZabbixServerUserCreator] = []
-            result[self.ZabbixServerUserCreator].append(json.dumps(s))
+            result["root"] = []
+            result["root"].append(json.dumps(s))
 
             return result
+            
         else:
+        
             return {}
