@@ -19,11 +19,13 @@ class UpdateStatusThread(Thread):
         while not self.stopped:
             time.sleep(int(self.manager.get_config_value('system', 'update-delay', '10')))
             if not self.stopped:
-                #try:
-                self.manager.send_update()
-                #except Exception as e:
-                #    logger.error("got error while updating resources: %s " % e.args)
 
+                if self.manager.updating==True:
+                    pass
+                else:
+                    self.manager.send_update()
+
+                   
     def stop(self):
         self.stopped = True
 
@@ -65,6 +67,9 @@ class MonitoringManager(AbstractManager):
         self.ZabbixServerUserCreator=None
         self.expDeployed=False
         
+        self.updating = False
+        
+        
     def create_user(self, username, password):
         user_info = messages_pb2.UserInfo(
             name=username,
@@ -99,6 +104,7 @@ class MonitoringManager(AbstractManager):
     def validate_resources(self, user_info=None, payload=None) -> None:
         logger.info("Requested validate_resources by user %s\n Payload %s" % (user_info.name,payload))
         resource = yaml.load(payload)
+        self.ZabbixServerUserCreator = user_info.name
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TOCREATE"
     
@@ -109,7 +115,9 @@ class MonitoringManager(AbstractManager):
         return
 
     def _update_status(self) -> dict:
-    
+        
+        self.updating = True
+        
         self.ZabbixServerInstance=None
         self.ZabbixServerIpAttached=False
         
@@ -165,19 +173,23 @@ class MonitoringManager(AbstractManager):
                 self.ZabbixInternalStatus="NONE"
             self.expDeployed = False
  
-        if self.JobInternalStatus == "NONE":
+        if self.ZabbixServerInstance is None:
             self.expDeployed = False
             
-        result = {}
-        s = {}
         
-        s["status"] = self.ZabbixInternalStatus
-        s["internalIp"] = self.ZabbixServerInternaIp
+        self.updating = False
         
-        result["root"] = []
-        result["root"].append(json.dumps(s))
         if self.expDeployed:
-            print(result)
+    
+            result = {}
+            s = {}
+            
+            s["status"] = self.ZabbixInternalStatus
+            s["internalIp"] = self.ZabbixServerInternaIp
+            
+            result[self.ZabbixServerUserCreator] = []
+            result[self.ZabbixServerUserCreator].append(json.dumps(s))
+
             return result
         else:
             return {}
