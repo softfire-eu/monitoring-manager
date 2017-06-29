@@ -8,41 +8,17 @@ from datetime import datetime
 
 from cork import Cork
 
-
-def get_username_and_password():
-    user = input("Username [%s]: " % getpass.getuser())
-    if not user:
-        user = getpass.getuser()
-
-    pprompt = lambda: (getpass.getpass(), getpass.getpass('Retype password: '))
-
-    p1, p2 = pprompt()
-    while p1 != p2:
-        print('Passwords do not match. Try again')
-        p1, p2 = pprompt()
-
-    get_role = lambda: input("chose the role between admin or experimenter [a/e]")
-    role = get_role()
-    while not role or (role != 'a' and role != 'e'):
-        role = get_role()
-
-    if role == 'a':
-        role = 'admin'
-    else:
-        role = 'experimenter'
-    return user, p1, role
-
-
 def populate_conf_directory(out_dir):
     cork = Cork(out_dir, initialize=True)
 
     cork._store.roles['admin'] = 100
+    cork._store.roles['portal'] = 70
     cork._store.roles['experimenter'] = 60
     cork._store.save_roles()
 
     tstamp = str(datetime.utcnow())
     
-    username, password, role ='root','root','experimenter'
+    username, password, role ='admin','admin','admin'
     user_cork = {
     'role': role,
     'hash': cork._hash(username, password),
@@ -51,7 +27,32 @@ def populate_conf_directory(out_dir):
     'creation_date': tstamp
     }
     
-    cork._store.users[username] = user_cork
+    cork._store.users[username] = user_cork 
+    
+    if 0:
+    
+        username, password, role ='root','root','experimenter'
+        user_cork = {
+        'role': role,
+        'hash': cork._hash(username, password),
+        'email_addr': username + '@localhost.local',
+        'desc': username + ' test user',
+        'creation_date': tstamp
+        }
+        
+        cork._store.users[username] = user_cork 
+
+        
+        username, password, role ='portal','portal','portal'
+        user_cork = {
+        'role': role,
+        'hash': cork._hash(username, password),
+        'email_addr': username + '@localhost.local',
+        'desc': username + ' test user',
+        'creation_date': tstamp
+        }
+        
+        cork._store.users[username] = user_cork
 
     cork._store.save_users()
 

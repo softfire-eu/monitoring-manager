@@ -68,6 +68,7 @@ class MonitoringManager(AbstractManager):
         self.ZabbixServerInternalIp=None
         self.ZabbixServerCurrentFloatingIp=None
         self.ZabbixServerUserCreator=None
+        self.ZabbixServerInstance=None
         self.expDeployed=False
         
         self.updating = False
@@ -104,14 +105,14 @@ class MonitoringManager(AbstractManager):
         return response
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-        logger.info("Requested validate_resources by user |%s| - Payload %s" % (user_info.name,payload.replace('\r',' ').replace('\n',' ')))
+        logger.info("Requested validate_resources by user |%s|" % (user_info.name))
         resource = yaml.load(payload)
         self.ZabbixServerUserCreator = user_info.name
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TOCREATE"
             
     def release_resources(self, user_info, payload=None):
-        logger.info("Requested release_resources by user |%s| - Payload %s" % (user_info.name,payload))
+        logger.info("Requested release_resources by user |%s|" % (user_info.name))
         if self.JobInternalStatus == "NONE":
             self.JobInternalStatus = "TODELETE"
             
@@ -120,42 +121,62 @@ class MonitoringManager(AbstractManager):
         self.updating = True
         
         if self.JobInternalStatus == "TODELETE":
+            logger.info("preparing to delete zabbix server")
             self.JobInternalStatus = "NONE"
             for s in self.OSnova.servers.list():
                 if s.name==self.ZabbixServerName:
                     self.ZabbixServerInstance=s
                     break
             if self.ZabbixServerInstance:
+                logger.info("zabbix server to delete found")
                 self.ZabbixServerInstance.delete()
+                logger.info("zabbix server deleted")
                 self.ZabbixServerInstance=None
                 self.ZabbixServerInternalIp=None
                 self.ZabbixServerCurrentFloatingIp=None
                 self.ZabbixInternalStatus="NONE"
+            else:
+                logger.info("zabbix server not found, nothing done")
             self.expDeployed = False
+            logger.info("ZabbixServerStatus {:>10}".format(self.ZabbixInternalStatus) )
             self.updating = False
             return {}
         
         if self.JobInternalStatus == "TOCREATE":
+            logger.info("preparing to create zabbix server")
             self.JobInternalStatus = "NONE"
-            NewServer = self.OSnova.servers.create(
-                            name=self.ZabbixServerName, 
-                            image=self.OSnova.glance.find_image(self.ZabbixServerImageName), 
-                            flavor=self.OSnova.flavors.find(name=self.ZabbixServerFlavour), 
-                            nics=[{'net-id': self.OSnova.neutron.find_network(self.ZabbixServerNetwork).id}],
-                            security_groups=[self.ZabbixServerSecGroups],
-                            )
-            id=NewServer.id   
-
-            while 1:
-                NewServer=self.OSnova.servers.get(id)
-                status=NewServer.status
-                if status!="BUILD":
+            for s in self.OSnova.servers.list():
+                if s.name==self.ZabbixServerName:
+                    self.ZabbixServerInstance=s
+                    logger.info("zabbix server already online")
                     break
-                time.sleep(0.3)
-            
-            NewServer.add_floating_ip(self.ZabbixServerFloatingIp)
-            self.ZabbixServerInstance = NewServer
-            self.expDeployed = True
+            if self.ZabbixServerInstance is None:
+                logger.info("no zabbix server found, preparing to create it")
+                NewServer = self.OSnova.servers.create(
+                                name=self.ZabbixServerName, 
+                                image=self.OSnova.glance.find_image(self.ZabbixServerImageName), 
+                                flavor=self.OSnova.flavors.find(name=self.ZabbixServerFlavour), 
+                                nics=[{'net-id': self.OSnova.neutron.find_network(self.ZabbixServerNetwork).id}],
+                                security_groups=[self.ZabbixServerSecGroups],
+                                )
+                id=NewServer.id
+                logger.info("zabbix server created, id is {}".format(id))
+
+                while 1:
+                    NewServer=self.OSnova.servers.get(id)
+                    status=NewServer.status
+                    logger.info("zabbix server status: {}".format(status))
+                    if status!="BUILD":
+                        break
+                    time.sleep(0.3)
+                    
+                logger.info("adding floating ip {}".format(self.ZabbixServerFloatingIp))
+                NewServer.add_floating_ip(self.ZabbixServerFloatingIp)
+                NewServer=self.OSnova.servers.get(id)
+                logger.info("floating ip added")
+                self.ZabbixServerInstance = NewServer
+                logger.info("zabbix deployed to {}".format(self.ZabbixServerInstance.networks))
+                self.expDeployed = True
         
         else:
             self.ZabbixServerInstance=None
@@ -188,7 +209,7 @@ class MonitoringManager(AbstractManager):
         if self.ZabbixServerInstance is None:
             self.expDeployed = False
         
-        logger.info("ZabbixServerStatus {:>10}   JobStatus {:>10}".format(self.ZabbixInternalStatus,self.JobInternalStatus) )
+        logger.info("ZabbixServerStatus {:>10}".format(self.ZabbixInternalStatus) )
         
         self.updating = False
         
@@ -201,8 +222,8 @@ class MonitoringManager(AbstractManager):
             s["internalIp"] = self.ZabbixServerInternalIp
             s["floatingIpIp"] = self.ZabbixServerCurrentFloatingIp
             
-            result["root"] = []
-            result["root"].append(json.dumps(s))
+            result[self.ZabbixServerUserCreator] = []
+            result[self.ZabbixServerUserCreator].append(json.dumps(s))
 
             return result
             

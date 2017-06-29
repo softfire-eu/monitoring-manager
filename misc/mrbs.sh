@@ -13,7 +13,7 @@ VENV_NAME="$HOME/.softfire"
 SESSION_NAME="softfire"
 CODE_LOCATION="/opt/softfire"
 CONFIG_LOCATION="/etc/softfire"
-CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini"
+CONFIG_FILE_LINKS="https://raw.githubusercontent.com/softfire-eu/experiment-manager/master/etc/experiment-manager.ini https://raw.githubusercontent.com/softfire-eu/experiment-manager/develop/etc/mapping-managers.json"
 
 function install_requirements {
 
