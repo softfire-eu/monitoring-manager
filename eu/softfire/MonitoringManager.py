@@ -21,12 +21,8 @@ class UpdateStatusThread(Thread):
         while not self.stopped:
             time.sleep(int(self.manager.get_config_value('system', 'update-delay', '10')))
             if not self.stopped:
-
-                if self.manager.updating==True:
-                    pass
-                else:
+                if self.manager.updating!=True:
                     self.manager.send_update()
-
                    
     def stop(self):
         self.stopped = True
