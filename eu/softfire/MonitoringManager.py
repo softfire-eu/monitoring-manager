@@ -43,8 +43,7 @@ class MonitoringManager(AbstractManager):
         os.environ["OS_AUTH_URL"]               = self.get_config_value("openstack-env", "OS_AUTH_URL", "")
         os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
         os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
-        
-        
+                
         from keystoneauth1 import loading
         from keystoneauth1 import session
         from novaclient import client
@@ -219,8 +218,11 @@ class MonitoringManager(AbstractManager):
             s = {}
             
             s["status"] = self.ZabbixInternalStatus
-            s["internalIp"] = self.ZabbixServerInternalIp
+            #s["internalIp"] = self.ZabbixServerInternalIp
             s["floatingIpIp"] = self.ZabbixServerCurrentFloatingIp
+            s["url"] = "http://{}/zabbix/".format(s["floatingIpIp"])
+            s["username"] = "Admin"
+            s["password"] = "zabbix"
             
             result[self.ZabbixServerUserCreator] = []
             result[self.ZabbixServerUserCreator].append(json.dumps(s))
