@@ -36,7 +36,7 @@ class MonitoringManager(AbstractManager):
 
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
-        self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
+        #self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
             
         os.environ["OS_USERNAME"]               = self.get_config_value("openstack-env", "OS_USERNAME", "")
         os.environ["OS_PASSWORD"]               = self.get_config_value("openstack-env", "OS_PASSWORD", "")
