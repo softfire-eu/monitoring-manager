@@ -37,23 +37,31 @@ class MonitoringManager(AbstractManager):
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
         #self.local_files_path = self.get_config_value("local-files", "path", "/etc/softfire/monitoring-manager")
-            
-        os.environ["OS_USERNAME"]               = self.get_config_value("openstack-env", "OS_USERNAME", "")
-        os.environ["OS_PASSWORD"]               = self.get_config_value("openstack-env", "OS_PASSWORD", "")
-        os.environ["OS_AUTH_URL"]               = self.get_config_value("openstack-env", "OS_AUTH_URL", "")
-        os.environ["OS_IDENTITY_API_VERSION"]   = self.get_config_value("openstack-env", "OS_IDENTITY_API_VERSION", "")
-        os.environ["OS_TENANT_NAME"]            = self.get_config_value("openstack-env", "OS_TENANT_NAME", "")
-                
+        credentials_files_path = self.get_config_value("openstack-credentials", "credentials_file", "")
+        with open(credentials_files_path) as json_data:
+            self.openstack_credentials = json.load(json_data)
+        
+        self.testbeds=[]
+        
+        for t in self.openstack_credentials.keys():
+            self.testbeds.append(t)
+        
+        starting_testbed="ericsson"
+        self.ZabbixTestbed = starting_testbed
+                        
         from keystoneauth1 import loading
         from keystoneauth1 import session
         from novaclient import client
         self.OSloader = loading.get_plugin_loader('password')
-        self.OSauth = self.OSloader.load_from_options(auth_url=os.environ["OS_AUTH_URL"],
-                                        username=os.environ["OS_USERNAME"],
-                                        password=os.environ["OS_PASSWORD"],
-                                        tenant_name=os.environ["OS_TENANT_NAME"])
+        self.OSauth = self.OSloader.load_from_options(
+                                        auth_url        =       self.openstack_credentials[self.ZabbixTestbed]["auth_url"],
+                                        username        =       self.openstack_credentials[self.ZabbixTestbed]["username"],
+                                        password        =       self.openstack_credentials[self.ZabbixTestbed]["password"],
+                                        tenant_name     =       self.openstack_credentials[self.ZabbixTestbed]["tenant_name"],
+                                        )
+                                        
         self.OSsession = session.Session(auth=self.OSauth)
-        self.OSnova = client.Client(os.environ["OS_IDENTITY_API_VERSION"], session=self.OSsession)
+        self.OSnova = client.Client(self.openstack_credentials[self.ZabbixTestbed]["api_version"], session=self.OSsession)
         
         self.ZabbixServerName=self.get_config_value("openstack-params", "instance_name", "")
         self.ZabbixServerFloatingIp=self.get_config_value("openstack-params", "floating_ip", "")
@@ -218,7 +226,7 @@ class MonitoringManager(AbstractManager):
             s = {}
             
             s["status"] = self.ZabbixInternalStatus
-            #s["internalIp"] = self.ZabbixServerInternalIp
+            s["internalIp"] = self.ZabbixServerInternalIp
             s["floatingIpIp"] = self.ZabbixServerCurrentFloatingIp
             s["url"] = "http://{}/zabbix/".format(s["floatingIpIp"])
             s["username"] = "Admin"
