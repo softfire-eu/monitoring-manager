@@ -190,19 +190,13 @@ class MonitoringManager(AbstractManager):
     def _update_status(self) -> dict:
         
         self.updating = True
-        
-            
-        
-        if self.JobInternalStatus == "TOCREATE":
-            pass
-        
-        else:
-            self.ZabbixServerInstance=None
-            self.ZabbixServerIpAttached=False        
-            for s in self.OSnova.servers.list():
-                if s.name==self.ZabbixServerName:
-                    self.ZabbixServerInstance=s
-                    break
+
+        self.ZabbixServerInstance=None
+        self.ZabbixServerIpAttached=False        
+        for s in self.OSnova.servers.list():
+            if s.name==self.ZabbixServerName:
+                self.ZabbixServerInstance=s
+                break
         
         if self.ZabbixServerInstance:
 
