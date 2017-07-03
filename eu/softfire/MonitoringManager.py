@@ -129,6 +129,7 @@ class MonitoringManager(AbstractManager):
                     break
 
             if floatingIp_toAdd==None:
+                
                 body = {
                     "floatingip": {
                         "floating_network_id": self.usersData[username]["nova"].neutron.find_network("public").id
@@ -136,11 +137,11 @@ class MonitoringManager(AbstractManager):
                         }
                 self.usersData[username]["neutron"].create_floatingip(body=body)
             
-            flips = self.usersData[username]["neutron"].list_floatingips()
-            for ip in flips["floatingips"]:
-                if ip["fixed_ip_address"]==None:
-                    floatingIp_toAdd = ip["floating_ip_address"]
-                    break
+                flips = self.usersData[username]["neutron"].list_floatingips()
+                for ip in flips["floatingips"]:
+                    if ip["fixed_ip_address"]==None:
+                        floatingIp_toAdd = ip["floating_ip_address"]
+                        break
                     
             logger.info("adding floating ip {}".format(floatingIp_toAdd))
             NewServer.add_floating_ip(floatingIp_toAdd)
