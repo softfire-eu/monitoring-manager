@@ -195,8 +195,8 @@ class MonitoringManager(AbstractManager):
         self.usersData[user_info.name]["neutron"]=None
 
     def release_resources(self, user_info, payload=None):
-        logger.info("Requested release_resources by user |%s|" % (user_info.name))
-        logger.info("Requested release_resources payload |%s|" % (payload))
+        logger.debug("Requested release_resources by user |%s|" % (user_info.name))
+        logger.debug("Requested release_resources payload |%s|" % (payload))
         logger.info("preparing to delete zabbix server")
         username = user_info.name
         resource = yaml.load(payload)
@@ -211,17 +211,20 @@ class MonitoringManager(AbstractManager):
             self.getOpenstack(username)
             
             extended_name = self.ZabbixServerName + "_" + username
+            
             for s in self.usersData[username]["nova"].servers.list():
                 if s.name==extended_name:
                     self.usersData[username]["serverInstance"]=s
                     break
             if self.usersData[username]["serverInstance"]:
-                logger.info("zabbix server to delete found")
+                logger.info("zabbix server to delete found: {}".format(extended_name))
                 self.usersData[username]["serverInstance"].delete()
                 logger.info("zabbix server deleted")
-                del(self.usersData[username])
             else:
                 logger.info("zabbix server not found, nothing done")
+            
+            del(self.usersData[username])
+        
         else:
             return
             
@@ -231,7 +234,7 @@ class MonitoringManager(AbstractManager):
         result = {}
         for exps in self.usersData.keys():
             if "output" in self.usersData[exps]:
-                logger.info(self.usersData[exps]["output"])
+                logger.debug(self.usersData[exps]["output"])
                 result[exps] = []
                 result[exps].append(json.dumps(self.usersData[exps]["output"]))
         return result
