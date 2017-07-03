@@ -133,22 +133,24 @@ class MonitoringManager(AbstractManager):
                 body = {
                     "floatingip": {
                         "floating_network_id": self.usersData[username]["nova"].neutron.find_network("public").id
-                            }
-                        }
+                            }}
                 self.usersData[username]["neutron"].create_floatingip(body=body)
-            
                 flips = self.usersData[username]["neutron"].list_floatingips()
                 for ip in flips["floatingips"]:
                     if ip["fixed_ip_address"]==None:
                         floatingIp_toAdd = ip["floating_ip_address"]
                         break
-                    
-            logger.info("adding floating ip {}".format(floatingIp_toAdd))
-            NewServer.add_floating_ip(floatingIp_toAdd)
-            NewServer=self.usersData[username]["nova"].servers.get(id)
-            logger.info("floating ip added")
+            
+            if floatingIp_toAdd:
+                logger.info("adding floating ip {}".format(floatingIp_toAdd))
+                NewServer.add_floating_ip(floatingIp_toAdd)
+                NewServer=self.usersData[username]["nova"].servers.get(id)
+                logger.info("floating ip added")
+                self.usersData[username]["floatingIp"] = floatingIp_toAdd
+            else:
+                self.usersData[username]["floatingIp"] = "UNABLE TO ASSOCIATE"
+            
             self.usersData[username]["serverInstance"] = NewServer
-            self.usersData[username]["floatingIp"] = floatingIp_toAdd
             logger.info("zabbix deployed to {}".format(self.usersData[username]["serverInstance"].networks))
 
             self.usersData[username]["output"]={
