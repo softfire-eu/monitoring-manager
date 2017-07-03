@@ -42,22 +42,8 @@ class MonitoringManager(AbstractManager):
         for t in self.openstack_credentials.keys():
             self.testbeds.append(t)
         
-        starting_testbed="ericsson"
-        self.ZabbixTestbed = starting_testbed
-                        
-        from keystoneauth1 import loading
-        from keystoneauth1 import session
-        from novaclient import client
-        self.OSloader = loading.get_plugin_loader('password')
-        self.OSauth = self.OSloader.load_from_options(
-                                        auth_url        =       self.openstack_credentials[self.ZabbixTestbed]["auth_url"],
-                                        username        =       self.openstack_credentials[self.ZabbixTestbed]["username"],
-                                        password        =       self.openstack_credentials[self.ZabbixTestbed]["password"],
-                                        tenant_name     =       self.openstack_credentials[self.ZabbixTestbed]["tenant_name"],
-                                        )
-                                        
-        self.OSsession = session.Session(auth=self.OSauth)
-        self.OSnova = client.Client(self.openstack_credentials[self.ZabbixTestbed]["api_version"], session=self.OSsession)
+        self.ZabbixTestbed = {}
+        self.OSnova = None         
         
         self.ZabbixServerName=self.get_config_value("openstack-params", "instance_name", "")
         self.ZabbixServerFloatingIp=self.get_config_value("openstack-params", "floating_ip", "")
@@ -104,6 +90,23 @@ class MonitoringManager(AbstractManager):
     def provide_resources(self, user_info, payload=None):
         logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("preparing to create zabbix server")
+        
+        
+        from keystoneauth1 import loading
+        from keystoneauth1 import session
+        from novaclient import client
+        self.OSloader = loading.get_plugin_loader('password')
+        self.OSauth = self.OSloader.load_from_options(
+                                        auth_url        =       self.openstack_credentials[self.ZabbixTestbed[self.ZabbixServerUserCreator]]["auth_url"],
+                                        username        =       self.openstack_credentials[self.ZabbixTestbed[self.ZabbixServerUserCreator]]["username"],
+                                        password        =       self.openstack_credentials[self.ZabbixTestbed[self.ZabbixServerUserCreator]]["password"],
+                                        tenant_name     =       self.openstack_credentials[self.ZabbixTestbed[self.ZabbixServerUserCreator]]["tenant_name"],
+                                        )
+                                        
+        self.OSsession = session.Session(auth=self.OSauth)
+        self.OSnova = client.Client(self.openstack_credentials[self.ZabbixTestbed[self.ZabbixServerUserCreator]]["api_version"], session=self.OSsession)
+        
+        
         for s in self.OSnova.servers.list():
             if s.name==self.ZabbixServerName:
                 self.ZabbixServerInstance=s
@@ -137,12 +140,13 @@ class MonitoringManager(AbstractManager):
             logger.info("zabbix deployed to {}".format(self.ZabbixServerInstance.networks))
             self.expDeployed = True
 
+        self.checkZabbixStatus()
         
         result = self.get_experiment_status()
         print ("****************")
         print (result)
         print ("****************")
-        return self.get_experiment_status()
+        return result
 
     def get_experiment_status(self):
         result = {}
@@ -160,49 +164,7 @@ class MonitoringManager(AbstractManager):
         
         return result
         
-    def validate_resources(self, user_info=None, payload=None) -> None:
-        logger.info("Requested validate_resources by user |%s|" % (user_info.name))
-        logger.debug("payload: %s" % payload)
-        resource = yaml.load(payload)
-        #logger.debug("payload: %s" % )
-        testbed = resource.get("properties").get("testbed")
-        if testbed not in self.testbeds:
-            raise MonitoringResourceValidationError(
-                    message="testbed not available"
-                    )
-        else:
-            self.ZabbixServerUserCreator = user_info.name
-            
-    def release_resources(self, user_info, payload=None):
-        logger.info("Requested release_resources by user |%s|" % (user_info.name))
-        logger.info("preparing to delete zabbix server")
-        self.JobInternalStatus = "NONE"
-        for s in self.OSnova.servers.list():
-            if s.name==self.ZabbixServerName:
-                self.ZabbixServerInstance=s
-                break
-        if self.ZabbixServerInstance:
-            logger.info("zabbix server to delete found")
-            self.ZabbixServerInstance.delete()
-            logger.info("zabbix server deleted")
-            self.ZabbixServerInstance=None
-            self.ZabbixServerInternalIp=None
-            self.ZabbixServerCurrentFloatingIp=None
-            self.ZabbixInternalStatus="NONE"
-        else:
-            logger.info("zabbix server not found, nothing done")
-        self.expDeployed = False
-            
-    def _update_status(self) -> dict:
-        
-        self.updating = True
-
-        self.ZabbixServerInstance=None
-        self.ZabbixServerIpAttached=False        
-        for s in self.OSnova.servers.list():
-            if s.name==self.ZabbixServerName:
-                self.ZabbixServerInstance=s
-                break
+    def checkZabbixStatus(self):
         
         if self.ZabbixServerInstance:
 
@@ -222,7 +184,60 @@ class MonitoringManager(AbstractManager):
                 self.ZabbixServerCurrentFloatingIp="---------"   
                 
         else:
-                self.ZabbixInternalStatus="NONE"
+                self.ZabbixInternalStatus="NONE"    
+        
+        return
+
+    def validate_resources(self, user_info=None, payload=None) -> None:
+        logger.info("Requested validate_resources by user |%s|" % (user_info.name))
+        logger.debug("payload: %s" % payload)
+        resource = yaml.load(payload)
+        testbed = resource.get("properties").get("testbed")
+        if testbed not in self.testbeds:
+            raise MonitoringResourceValidationError(
+                    message="testbed not available"
+                    )
+        else:
+            self.ZabbixServerUserCreator = user_info.name
+            self.ZabbixTestbed[self.ZabbixServerUserCreator] = testbed
+            
+    def release_resources(self, user_info, payload=None):
+        logger.info("Requested release_resources by user |%s|" % (user_info.name))
+        logger.info("preparing to delete zabbix server")
+        self.JobInternalStatus = "NONE"
+        for s in self.OSnova.servers.list():
+            if s.name==self.ZabbixServerName:
+                self.ZabbixServerInstance=s
+                break
+        if self.ZabbixServerInstance:
+            logger.info("zabbix server to delete found")
+            self.ZabbixServerInstance.delete()
+            logger.info("zabbix server deleted")
+            self.ZabbixServerInstance=None
+            self.ZabbixServerInternalIp=None
+            self.ZabbixServerCurrentFloatingIp=None
+            self.ZabbixInternalStatus="NONE"
+        else:
+            logger.info("zabbix server not found, nothing done")
+        
+        self.expDeployed = False
+        self.ZabbixTestbed[user_info.name] = None
+        self.OSnova = None 
+        
+    def _update_status(self) -> dict:
+        
+        self.updating = True
+ 
+        self.ZabbixServerInstance=None
+        self.ZabbixServerIpAttached=False
+
+        if self.OSnova:
+            for s in self.OSnova.servers.list():
+                if s.name==self.ZabbixServerName:
+                    self.ZabbixServerInstance=s
+                    break
+        
+        self.checkZabbixStatus()
 
         if self.ZabbixServerInstance is None:
             self.expDeployed = False
@@ -232,9 +247,6 @@ class MonitoringManager(AbstractManager):
         self.updating = False
         
         if self.expDeployed:
-
             return self.get_experiment_status()
-            
         else:
-        
             return {}
