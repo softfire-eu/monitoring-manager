@@ -164,8 +164,14 @@ class MonitoringManager(AbstractManager):
         logger.info("Requested validate_resources by user |%s|" % (user_info.name))
         logger.debug("payload: %s" % payload)
         resource = yaml.load(payload)
-        self.ZabbixServerUserCreator = user_info.name
-
+        #logger.debug("payload: %s" % )
+        testbed = resource.get("properties").get("testbed")
+        if testbed not in self.testbeds:
+            raise MonitoringResourceValidationError(
+                    message="testbed not available"
+                    )
+        else:
+            self.ZabbixServerUserCreator = user_info.name
             
     def release_resources(self, user_info, payload=None):
         logger.info("Requested release_resources by user |%s|" % (user_info.name))
