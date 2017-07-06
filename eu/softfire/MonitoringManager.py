@@ -155,7 +155,6 @@ class MonitoringManager(AbstractManager):
                     break
 
             if floatingIp_toAdd == None:
-
                 body = {
                     "floatingip": {
                         "floating_network_id": self.usersData[username]["nova"].neutron.find_network("public").id
