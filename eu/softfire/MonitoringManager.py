@@ -1,13 +1,12 @@
-from threading import Thread
-
 import yaml,random
+
+from threading import Thread
 from sdk.softfire.manager import AbstractManager
 
 from eu.softfire.exceptions.monitoring.exceptions import *
 from eu.softfire.utils.monitoring.utils import *
 
 logger = get_logger(config_path)
-
 
 class UpdateStatusThread(Thread):
     def __init__(self, manager):
@@ -34,8 +33,10 @@ class MonitoringManager(AbstractManager):
             self.openstack_credentials = json.load(json_data)
 
         self.testbeds = []
+        self.connectionClients = {}
         for t in self.openstack_credentials.keys():
             self.testbeds.append(t)
+            self.connectionClients[t]={}
 
         self.usersData = {}
 
@@ -72,7 +73,8 @@ class MonitoringManager(AbstractManager):
         return result
 
     def getOpenstack(self, username):
-        if self.usersData[username]["nova"] is None:
+        current_testbed = self.usersData[username]["testbed"]
+        if "nova" not in self.connectionClients[current_testbed]:
             from keystoneauth1 import loading
             from keystoneauth1 import session
             from novaclient import client
@@ -84,11 +86,10 @@ class MonitoringManager(AbstractManager):
                 password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
                 tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
             )
-
             OSsession = session.Session(auth=OSauth)
-            self.usersData[username]["nova"] = client.Client(
+            self.connectionClients[current_testbed]["nova"] = client.Client(
                 self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"], session=OSsession)
-            self.usersData[username]["neutron"] = nclient.Client(session=OSsession)
+            self.connectionClients[current_testbed]["neutron"] = nclient.Client(session=OSsession)
 
     def provide_resources(self, user_info, payload=None):
         #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
@@ -99,26 +100,25 @@ class MonitoringManager(AbstractManager):
         username = user_info.name
         self.getOpenstack(username)
         extended_name = self.ZabbixServerName + "_" + username
-        for s in self.usersData[username]["nova"].servers.list():
+        
+        current_testbed = self.usersData[username]["testbed"]
+        userNova = self.connectionClients[current_testbed]["nova"]
+        userNeutron = self.connectionClients[current_testbed]["neutron"]
+        
+        for s in userNova.servers.list():
 
             if s.name==extended_name:
                 self.usersData[username]["serverInstance"]=s
                 self.usersData[username]["floatingIp"] = s.networks[self.ZabbixServerNetwork][1]
                 self.usersData[username]["internalIp"] = s.networks[self.ZabbixServerNetwork][0]
-                
-                
                 self.usersData[username]["output"]={
-                "testbed" : self.usersData[username]["testbed"],
-                "internalIp" : self.usersData[username]["internalIp"],
-                "floatingIpIp" : self.usersData[username]["floatingIp"],
-                "url" : "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
-                "username" : "Admin",
-                "password" : "zabbix",
+                    "testbed" : self.usersData[username]["testbed"],
+                    "internalIp" : self.usersData[username]["internalIp"],
+                    "floatingIpIp" : self.usersData[username]["floatingIp"],
+                    "url" : "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
+                    "username" : "Admin",
+                    "password" : "zabbix",
                 }
-                
-            if s.name == extended_name:
-                self.usersData[username]["serverInstance"] = s
-
                 logger.info("zabbix server already online")
                 logger.info(json.dumps(self.usersData[username]["output"]))
                 return [json.dumps(self.usersData[username]["output"])]
@@ -126,18 +126,18 @@ class MonitoringManager(AbstractManager):
 
         if self.usersData[username]["serverInstance"] is None:
             logger.info("no zabbix server found, preparing to create it")
-            NewServer = self.usersData[username]["nova"].servers.create(
+            NewServer = userNova.servers.create(
                 name=extended_name,
-                image=self.usersData[username]["nova"].glance.find_image(self.ZabbixServerImageName),
-                flavor=self.usersData[username]["nova"].flavors.find(name=self.ZabbixServerFlavour),
-                nics=[{'net-id': self.usersData[username]["nova"].neutron.find_network(self.ZabbixServerNetwork).id}],
+                image=userNova.glance.find_image(self.ZabbixServerImageName),
+                flavor=userNova.flavors.find(name=self.ZabbixServerFlavour),
+                nics=[{'net-id': userNova.neutron.find_network(self.ZabbixServerNetwork).id}],
                 security_groups=[self.ZabbixServerSecGroups],
             )
             id = NewServer.id
             logger.info("zabbix server created, id is {}".format(id))
 
             while 1:
-                NewServer = self.usersData[username]["nova"].servers.get(id)
+                NewServer = userNova.servers.get(id)
                 status = NewServer.status
                 logger.info("zabbix server status: {}".format(status))
                 if status != "BUILD":
@@ -147,7 +147,7 @@ class MonitoringManager(AbstractManager):
             self.usersData[username]["internalIp"] = NewServer.networks[self.ZabbixServerNetwork][0]
 
             floatingIp_toAdd = None
-            flips = self.usersData[username]["neutron"].list_floatingips()
+            flips = userNeutron.list_floatingips()
             #random.shuffle(flips["floatingips"])
             for ip in flips["floatingips"]:
                 if ip["fixed_ip_address"] == None:
@@ -159,8 +159,8 @@ class MonitoringManager(AbstractManager):
                     "floatingip": {
                         "floating_network_id": self.usersData[username]["nova"].neutron.find_network("public").id
                     }}
-                self.usersData[username]["neutron"].create_floatingip(body=body)
-                flips = self.usersData[username]["neutron"].list_floatingips()
+                userNeutron.create_floatingip(body=body)
+                flips = userNeutron.list_floatingips()
                 for ip in flips["floatingips"]:
                     if ip["fixed_ip_address"] == None:
                         floatingIp_toAdd = ip["floating_ip_address"]
@@ -169,7 +169,7 @@ class MonitoringManager(AbstractManager):
             if floatingIp_toAdd:
                 logger.info("adding floating ip {}".format(floatingIp_toAdd))
                 NewServer.add_floating_ip(floatingIp_toAdd)
-                NewServer = self.usersData[username]["nova"].servers.get(id)
+                NewServer = userNova.servers.get(id)
                 logger.info("floating ip added")
                 self.usersData[username]["floatingIp"] = floatingIp_toAdd
             else:
@@ -217,8 +217,6 @@ class MonitoringManager(AbstractManager):
         self.usersData[user_info.name]["internalIp"] = None
         self.usersData[user_info.name]["floatingIp"] = None
         self.usersData[user_info.name]["serverInstance"] = None
-        self.usersData[user_info.name]["nova"] = None
-        self.usersData[user_info.name]["neutron"] = None
 
     def release_resources(self, user_info, payload=None):
         logger.info("***Requested*** release_resources by user |%s|" % (user_info.name))
@@ -226,25 +224,26 @@ class MonitoringManager(AbstractManager):
         logger.info("preparing to delete zabbix server")
         username = user_info.name
         resource = yaml.load(payload)
-
+        
+        current_testbed = self.usersData[username]["testbed"]
+        userNova = self.connectionClients[current_testbed]["nova"]
+        userNeutron = self.connectionClients[current_testbed]["neutron"]
         try:
             testbed = resource.get("testbed")
         except:
-            logger.info("***Requested*** release_resources |%s|" % (resource))
+            logger.info("***ERROR*** release_resources |%s|" % (resource))
             return
-        testbed = resource.get("testbed")
+
         if testbed:
             if username not in self.usersData:
                 self.usersData[username]={}
                 self.usersData[username]["testbed"]=testbed
-                self.usersData[user_info.name]["nova"]=None
-                self.usersData[user_info.name]["neutron"]=None
                 
             self.getOpenstack(username)
             
             extended_name = self.ZabbixServerName + "_" + username
             
-            for s in self.usersData[username]["nova"].servers.list():
+            for s in userNova.servers.list():
                 if s.name==extended_name:
                     self.usersData[username]["serverInstance"]=s
                     break
@@ -260,37 +259,6 @@ class MonitoringManager(AbstractManager):
         else:
             return
             
-
-    def _update_status(self) -> dict:
-        #logger.debug("_update_status")
-        if resource and isinstance(resource, dict):
-            testbed = resource.get("testbed")
-            if testbed:
-                if username not in self.usersData:
-                    self.usersData[username] = {}
-                    self.usersData[username]["testbed"] = testbed
-                    self.usersData[user_info.name]["nova"] = None
-                    self.usersData[user_info.name]["neutron"] = None
-
-                self.getOpenstack(username)
-
-                extended_name = self.ZabbixServerName + "_" + username
-
-                for s in self.usersData[username]["nova"].servers.list():
-                    if s.name == extended_name:
-                        self.usersData[username]["serverInstance"] = s
-                        break
-                if self.usersData[username]["serverInstance"]:
-                    logger.info("zabbix server to delete found: {}".format(extended_name))
-                    self.usersData[username]["serverInstance"].delete()
-                    logger.info("zabbix server deleted")
-                else:
-                    logger.info("zabbix server not found, nothing done")
-
-                del (self.usersData[username])
-
-        return
-
     def _update_status(self) -> dict:
         # logger.debug("_update_status")
         result = {}
