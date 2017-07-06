@@ -192,29 +192,8 @@ class MonitoringManager(AbstractManager):
         return {}
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-        
-        #logger.info("Requested validate_resources by user |%s|" % (dir(user_info)))
-        #logger.info("Requested validate_resources by user |%r|" % (user_info.testbed_tenants))
-        #logger.info("Requested validate_resources by user |%r|" % (user_info.testbed_tenants[TESTBED_MAPPING['ericsson']]))
+
         logger.info("***Requested*** validate_resources by user |%s|" % (user_info.name))
-        
-        if user_info.name=='':
-            self.usersData[username]["output"] = {
-                "testbed": self.usersData[username]["testbed"],
-                "internalIp": self.usersData[username]["internalIp"],
-                "floatingIp": self.usersData[username]["floatingIp"],
-                "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
-                "username": "Admin",
-                "password": "zabbix",
-            }
-
-            return [json.dumps(self.usersData[username]["output"])]
-
-        raise Exception("zabbix server already deployed")
-
-    def validate_resources(self, user_info=None, payload=None) -> None:
-
-        logger.info("Requested validate_resources by user |%s|" % (user_info.name))
 
         if user_info.name == '':
 
