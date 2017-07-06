@@ -59,7 +59,7 @@ class MonitoringManager(AbstractManager):
         return None
 
     def list_resources(self, user_info=None, payload=None):
-        logger.debug("List resources")
+        #logger.debug("List resources")
         resource_id = "monitor"
         description = "This resource permits to deploy a ZabbixServer"
         cardinality = 1
@@ -89,6 +89,7 @@ class MonitoringManager(AbstractManager):
 
     def provide_resources(self, user_info, payload=None):
         #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
+        logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
         logger.info("preparing to create zabbix server")
         username = user_info.name
         self.getOpenstack(username)
@@ -96,7 +97,22 @@ class MonitoringManager(AbstractManager):
         for s in self.usersData[username]["nova"].servers.list():
             if s.name==extended_name:
                 self.usersData[username]["serverInstance"]=s
+                self.usersData[username]["floatingIp"] = s.networks[self.ZabbixServerNetwork][1]
+                self.usersData[username]["internalIp"] = s.networks[self.ZabbixServerNetwork][0]
+                
+                
+                self.usersData[username]["output"]={
+                "testbed" : self.usersData[username]["testbed"],
+                "internalIp" : self.usersData[username]["internalIp"],
+                "floatingIpIp" : self.usersData[username]["floatingIp"],
+                "url" : "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
+                "username" : "Admin",
+                "password" : "zabbix",
+                }
+                
                 logger.info("zabbix server already online")
+                logger.info(json.dumps(self.usersData[username]["output"]))
+                return [json.dumps(self.usersData[username]["output"])]
                 break
                 
         if self.usersData[username]["serverInstance"] is None:
@@ -123,6 +139,8 @@ class MonitoringManager(AbstractManager):
             
             floatingIp_toAdd=None
             flips = self.usersData[username]["neutron"].list_floatingips()
+            import random
+            random.shuffle(flips["floatingips"])
             for ip in flips["floatingips"]:
                 if ip["fixed_ip_address"]==None:
                     floatingIp_toAdd = ip["floating_ip_address"]
@@ -162,13 +180,16 @@ class MonitoringManager(AbstractManager):
                 "password" : "zabbix",
                 }
                 
-            return json.dumps(self.usersData[username]["output"])
+            return [json.dumps(self.usersData[username]["output"])]
             
         return {}
 
     def validate_resources(self, user_info=None, payload=None) -> None:
         
-        logger.info("Requested validate_resources by user |%s|" % (user_info.name))
+        #logger.info("Requested validate_resources by user |%s|" % (dir(user_info)))
+        #logger.info("Requested validate_resources by user |%r|" % (user_info.testbed_tenants))
+        #logger.info("Requested validate_resources by user |%r|" % (user_info.testbed_tenants[TESTBED_MAPPING['ericsson']]))
+        logger.info("***Requested*** validate_resources by user |%s|" % (user_info.name))
         
         if user_info.name=='':
             raise MonitoringResourceValidationError(
@@ -195,11 +216,16 @@ class MonitoringManager(AbstractManager):
         self.usersData[user_info.name]["neutron"]=None
 
     def release_resources(self, user_info, payload=None):
-        logger.debug("Requested release_resources by user |%s|" % (user_info.name))
-        logger.debug("Requested release_resources payload |%s|" % (payload))
+        logger.info("***Requested*** release_resources by user |%s|" % (user_info.name))
+        #logger.debug("Requested release_resources payload |%s|" % (payload))
         logger.info("preparing to delete zabbix server")
         username = user_info.name
         resource = yaml.load(payload)
+        try:
+            testbed = resource.get("testbed")
+        except:
+            logger.info("***Requested*** release_resources |%s|" % (resource))
+            return
         testbed = resource.get("testbed")
         if testbed:
             if username not in self.usersData:
@@ -230,12 +256,14 @@ class MonitoringManager(AbstractManager):
             
 
     def _update_status(self) -> dict:
-        logger.debug("_update_status")
+        #logger.debug("_update_status")
         result = {}
         for exps in self.usersData.keys():
             if "output" in self.usersData[exps]:
-                logger.debug(self.usersData[exps]["output"])
+                #logger.debug(self.usersData[exps]["output"])
                 result[exps] = []
                 result[exps].append(json.dumps(self.usersData[exps]["output"]))
+                
+        #print (result)
         return result
         
