@@ -148,7 +148,7 @@ class MonitoringManager(AbstractManager):
 
             floatingIp_toAdd = None
             flips = self.usersData[username]["neutron"].list_floatingips()
-            random.shuffle(flips["floatingips"])
+            #random.shuffle(flips["floatingips"])
             for ip in flips["floatingips"]:
                 if ip["fixed_ip_address"] == None:
                     floatingIp_toAdd = ip["floating_ip_address"]
