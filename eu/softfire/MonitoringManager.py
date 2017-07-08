@@ -44,7 +44,6 @@ class MonitoringManager(AbstractManager):
         self.ZabbixServerFlavour = self.get_config_value("openstack-params", "flavour", "")
         self.ZabbixServerImageName = self.get_config_value("openstack-params", "image_name", "")
         self.ZabbixServerSecGroups = self.get_config_value("openstack-params", "security_group", "")
-        self.ZabbixServerNetwork = self.get_config_value("openstack-params", "network", "")
 
     def create_user(self, username, password):
         user_info = messages_pb2.UserInfo(
@@ -104,13 +103,15 @@ class MonitoringManager(AbstractManager):
         current_testbed = self.usersData[username]["testbed"]
         userNova = self.connectionClients[current_testbed]["nova"]
         userNeutron = self.connectionClients[current_testbed]["neutron"]
+        lan_name= self.usersData[username]["lan_name"]
+        
         
         for s in userNova.servers.list():
 
             if s.name==extended_name:
                 self.usersData[username]["serverInstance"]=s
-                self.usersData[username]["floatingIp"] = s.networks[self.ZabbixServerNetwork][1]
-                self.usersData[username]["internalIp"] = s.networks[self.ZabbixServerNetwork][0]
+                self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
+                self.usersData[username]["internalIp"] = s.networks[lan_name][0]
                 self.usersData[username]["output"]={
                     "testbed" : self.usersData[username]["testbed"],
                     "internalIp" : self.usersData[username]["internalIp"],
@@ -130,7 +131,7 @@ class MonitoringManager(AbstractManager):
                 name=extended_name,
                 image=userNova.glance.find_image(self.ZabbixServerImageName),
                 flavor=userNova.flavors.find(name=self.ZabbixServerFlavour),
-                nics=[{'net-id': userNova.neutron.find_network(self.ZabbixServerNetwork).id}],
+                nics=[{'net-id': userNova.neutron.find_network(lan_name).id}],
                 security_groups=[self.ZabbixServerSecGroups],
             )
             id = NewServer.id
@@ -144,7 +145,7 @@ class MonitoringManager(AbstractManager):
                     break
                 time.sleep(0.3)
 
-            self.usersData[username]["internalIp"] = NewServer.networks[self.ZabbixServerNetwork][0]
+            self.usersData[username]["internalIp"] = NewServer.networks[lan_name][0]
 
             floatingIp_toAdd = None
             flips = userNeutron.list_floatingips()
@@ -192,7 +193,8 @@ class MonitoringManager(AbstractManager):
         return {}
 
     def validate_resources(self, user_info=None, payload=None) -> None:
-
+        print()
+        print()
         logger.info("***Requested*** validate_resources by user |%s|" % (user_info.name))
 
         if user_info.name == '':
@@ -207,13 +209,17 @@ class MonitoringManager(AbstractManager):
             return
 
         testbed = resource.get("properties").get("testbed")
+        
         if testbed not in self.testbeds:
             raise MonitoringResourceValidationError(
                 message="testbed not available"
             )
+        
+        lan_name = resource.get("properties").get("lan_name")
 
         self.usersData[user_info.name] = {}
         self.usersData[user_info.name]["testbed"] = testbed
+        self.usersData[user_info.name]["lan_name"] = lan_name
         self.usersData[user_info.name]["internalIp"] = None
         self.usersData[user_info.name]["floatingIp"] = None
         self.usersData[user_info.name]["serverInstance"] = None
