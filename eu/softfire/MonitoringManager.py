@@ -28,7 +28,6 @@ class MonitoringManager(AbstractManager):
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
 
-
         credentials_files_path = self.get_config_value("openstack-credentials", "credentials_file", "")
         with open(credentials_files_path) as json_data:
             self.openstack_credentials = json.load(json_data)
@@ -105,6 +104,7 @@ class MonitoringManager(AbstractManager):
                 )
 
             OSsession = session.Session(auth=OSauth)
+            
             self.connectionClients[current_testbed]["nova"] = client.Client(
                 2, session=OSsession)
                 
