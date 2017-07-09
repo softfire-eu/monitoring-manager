@@ -85,6 +85,7 @@ class MonitoringManager(AbstractManager):
             from keystoneauth1.identity import v2, v3
             
             if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==2:
+                logger.info("keystoneauth1.identity v2")
                 OSloader = loading.get_plugin_loader('password')
                 OSauth = OSloader.load_from_options(
                     auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
@@ -94,6 +95,7 @@ class MonitoringManager(AbstractManager):
                 )
                 
             if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==3:
+                logger.info("keystoneauth1.identity v3")
                 OSauth = v3.Password(
                     auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
                     username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
@@ -127,7 +129,7 @@ class MonitoringManager(AbstractManager):
 
             if s.name==extended_name:
 
-            self.usersData[username]["serverInstance"]=s
+                self.usersData[username]["serverInstance"]=s
                 self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
                 self.usersData[username]["internalIp"] = s.networks[lan_name][0]
                 self.usersData[username]["output"]={
