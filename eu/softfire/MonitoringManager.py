@@ -74,6 +74,7 @@ class MonitoringManager(AbstractManager):
     def getOpenstack(self, username):
 
         current_testbed = self.usersData[username]["testbed"]
+        log_header = get_log_header(username,current_testbed)
         
         if "nova" not in self.connectionClients[current_testbed]:
             
@@ -84,7 +85,7 @@ class MonitoringManager(AbstractManager):
             from keystoneauth1.identity import v2, v3
             
             if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==2:
-                logger.info("keystoneauth1.identity v2")
+                logger.info("{}connecting to {} using v2 auth".format(log_header,self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"]))
                 OSloader = loading.get_plugin_loader('password')
                 OSauth = OSloader.load_from_options(
                     auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
@@ -94,7 +95,7 @@ class MonitoringManager(AbstractManager):
                 )
                 
             if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==3:
-                logger.info("keystoneauth1.identity v3")
+                logger.info("{}connecting to {} using v3 auth".format(log_header,self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"]))
                 OSauth = v3.Password(
                     auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
                     username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
@@ -114,7 +115,8 @@ class MonitoringManager(AbstractManager):
         #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
         # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
-        logger.info("preparing to create zabbix server")
+        
+        
         username = user_info.name
         self.getOpenstack(username)
         extended_name = self.ZabbixServerName + "_" + username
@@ -124,6 +126,9 @@ class MonitoringManager(AbstractManager):
         userNeutron = self.connectionClients[current_testbed]["neutron"]
         lan_name= self.usersData[username]["lan_name"]
         
+        log_header = get_log_header(username,current_testbed)
+        
+        logger.info("{}preparing to create zabbix server".format(log_header))
         
         for s in userNova.servers.list():
 
@@ -140,13 +145,13 @@ class MonitoringManager(AbstractManager):
                     "username" : "Admin",
                     "password" : "zabbix",
                 }
-                logger.info("zabbix server already online")
+                logger.info("{}zabbix server already online".format(log_header))
                 logger.info(json.dumps(self.usersData[username]["output"]))
                 return [json.dumps(self.usersData[username]["output"])]
                 break
 
         if self.usersData[username]["serverInstance"] is None:
-            logger.info("no zabbix server found, preparing to create it")
+            logger.info("{}no zabbix server found, preparing to create it".format(log_header))
             NewServer = userNova.servers.create(
                 name=extended_name,
                 image=userNova.glance.find_image(self.ZabbixServerImageName),
@@ -155,12 +160,12 @@ class MonitoringManager(AbstractManager):
                 security_groups=[self.ZabbixServerSecGroups],
             )
             id = NewServer.id
-            logger.info("zabbix server created, id is {}".format(id))
+            logger.info("{}zabbix server created, id is {}".format(log_header,id))
 
             while 1:
                 NewServer = userNova.servers.get(id)
                 status = NewServer.status
-                logger.info("zabbix server status: {}".format(status))
+                logger.info("{}zabbix server status: {}".format(log_header,status))
                 if status != "BUILD":
                     break
                 time.sleep(0.3)
@@ -188,16 +193,16 @@ class MonitoringManager(AbstractManager):
                         break
 
             if floatingIp_toAdd:
-                logger.info("adding floating ip {}".format(floatingIp_toAdd))
+                logger.info("{}adding floating ip {}".format(log_header,floatingIp_toAdd))
                 NewServer.add_floating_ip(floatingIp_toAdd)
                 NewServer = userNova.servers.get(id)
-                logger.info("floating ip added")
+                logger.info("{}floating ip added".format(log_header))
                 self.usersData[username]["floatingIp"] = floatingIp_toAdd
             else:
                 self.usersData[username]["floatingIp"] = "UNABLE TO ASSOCIATE"
 
             self.usersData[username]["serverInstance"] = NewServer
-            logger.info("zabbix deployed to {}".format(self.usersData[username]["serverInstance"].networks))
+            logger.info("{}zabbix deployed to {}".format(log_header,self.usersData[username]["serverInstance"].networks))
 
             self.usersData[username]["output"]={
                 "testbed" : self.usersData[username]["testbed"],
@@ -247,7 +252,6 @@ class MonitoringManager(AbstractManager):
     def release_resources(self, user_info, payload=None):
         logger.info("***Requested*** release_resources by user |%s|" % (user_info.name))
         #logger.debug("Requested release_resources payload |%s|" % (payload))
-        logger.info("preparing to delete zabbix server")
         username = user_info.name
         resource = yaml.load(payload)
         
@@ -267,7 +271,11 @@ class MonitoringManager(AbstractManager):
             if username not in self.usersData:
                 self.usersData[username]={}
                 self.usersData[username]["testbed"]=testbed
-                
+
+            log_header = get_log_header(username,testbed)
+            
+            logger.info("{}preparing to delete zabbix server".format(log_header))
+            
             self.getOpenstack(username)
             
             extended_name = self.ZabbixServerName + "_" + username
@@ -277,11 +285,11 @@ class MonitoringManager(AbstractManager):
                     self.usersData[username]["serverInstance"]=s
                     break
             if self.usersData[username]["serverInstance"]:
-                logger.info("zabbix server to delete found: {}".format(extended_name))
+                logger.info("{}zabbix server to delete found: {}".format(log_header,extended_name))
                 self.usersData[username]["serverInstance"].delete()
-                logger.info("zabbix server deleted")
+                logger.info("{}zabbix server deleted".format(log_header))
             else:
-                logger.info("zabbix server not found, nothing done")
+                logger.info("{}zabbix server not found, nothing done".format(log_header))
             
             del(self.usersData[username])
         

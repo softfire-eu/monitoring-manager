@@ -12,3 +12,5 @@ def get_logger(config_path):
 def random_string(size):
     return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
 
+def get_log_header(username,current_testbed):
+    return "{}@{} - ".format(username,current_testbed)
