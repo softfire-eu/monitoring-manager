@@ -111,7 +111,6 @@ class MonitoringManager(AbstractManager):
     def provide_resources(self, user_info, payload=None):
         #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
-
         # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("preparing to create zabbix server")
         username = user_info.name
