@@ -28,10 +28,11 @@ class MonitoringManager(AbstractManager):
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
 
+
         credentials_files_path = self.get_config_value("openstack-credentials", "credentials_file", "")
         with open(credentials_files_path) as json_data:
             self.openstack_credentials = json.load(json_data)
-
+            
         self.testbeds = []
         self.connectionClients = {}
         for t in self.openstack_credentials.keys():
@@ -72,22 +73,39 @@ class MonitoringManager(AbstractManager):
         return result
 
     def getOpenstack(self, username):
+
         current_testbed = self.usersData[username]["testbed"]
+        
         if "nova" not in self.connectionClients[current_testbed]:
+            
             from keystoneauth1 import loading
             from keystoneauth1 import session
             from novaclient import client
             from neutronclient.v2_0 import client as nclient
-            OSloader = loading.get_plugin_loader('password')
-            OSauth = OSloader.load_from_options(
-                auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
-                username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
-                password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
-                tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
-            )
+            from keystoneauth1.identity import v2, v3
+            
+            if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==2:
+                OSloader = loading.get_plugin_loader('password')
+                OSauth = OSloader.load_from_options(
+                    auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
+                    username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
+                    password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
+                    tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
+                )
+                
+            if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==3:
+                OSauth = v3.Password(
+                    auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
+                    username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
+                    password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
+                    user_domain_name=self.openstack_credentials[self.usersData[username]["testbed"]]["user_domain_name"],
+                    project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
+                )
+
             OSsession = session.Session(auth=OSauth)
             self.connectionClients[current_testbed]["nova"] = client.Client(
-                self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"], session=OSsession)
+                2, session=OSsession)
+                
             self.connectionClients[current_testbed]["neutron"] = nclient.Client(session=OSsession)
 
     def provide_resources(self, user_info, payload=None):
@@ -109,7 +127,8 @@ class MonitoringManager(AbstractManager):
         for s in userNova.servers.list():
 
             if s.name==extended_name:
-                self.usersData[username]["serverInstance"]=s
+
+            self.usersData[username]["serverInstance"]=s
                 self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
                 self.usersData[username]["internalIp"] = s.networks[lan_name][0]
                 self.usersData[username]["output"]={
@@ -232,6 +251,9 @@ class MonitoringManager(AbstractManager):
         resource = yaml.load(payload)
         
         current_testbed = self.usersData[username]["testbed"]
+        if "nova" not in self.connectionClients[current_testbed]:
+            return
+            
         userNova = self.connectionClients[current_testbed]["nova"]
         userNeutron = self.connectionClients[current_testbed]["neutron"]
         try:
