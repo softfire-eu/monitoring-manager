@@ -1,12 +1,18 @@
-import yaml,random
-
 from threading import Thread
+
+import yaml
+from keystoneauth1 import loading
+from keystoneauth1 import session
+from keystoneauth1.identity import v3
+from neutronclient.v2_0 import client as nclient
+from novaclient import client
 from sdk.softfire.manager import AbstractManager
 
 from eu.softfire.exceptions.monitoring.exceptions import *
 from eu.softfire.utils.monitoring.utils import *
 
 logger = get_logger(config_path)
+
 
 class UpdateStatusThread(Thread):
     def __init__(self, manager):
@@ -31,7 +37,7 @@ class MonitoringManager(AbstractManager):
         credentials_files_path = self.get_config_value("openstack-credentials", "credentials_file", "")
         with open(credentials_files_path) as json_data:
             self.openstack_credentials = json.load(json_data)
-            
+
         self.testbeds = []
         for t in self.openstack_credentials.keys():
             self.testbeds.append(t)
@@ -57,7 +63,7 @@ class MonitoringManager(AbstractManager):
         return None
 
     def list_resources(self, user_info=None, payload=None):
-        #logger.debug("List resources")
+        # logger.debug("List resources")
         resource_id = "monitor"
         description = "This resource permits to deploy a ZabbixServer"
         cardinality = 1
@@ -69,79 +75,87 @@ class MonitoringManager(AbstractManager):
                                           node_type=node_type, testbed=testbed))
         return result
 
-    def getOpenstack(self, username):
+    def get_openstack(self, username, password=None, project=None):
 
         current_testbed = self.usersData[username]["testbed"]
-        log_header = get_log_header(username,current_testbed)
-        
-        if "nova" not in self.usersData[username]:  #clients (nova, neutron) have to be in the userdata, since openstack tenants are user bounded
-            
-            from keystoneauth1 import loading
-            from keystoneauth1 import session
-            from novaclient import client
-            from neutronclient.v2_0 import client as nclient
-            from keystoneauth1.identity import v2, v3
-            
-            if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==2:
-                logger.info("{}connecting to {} using v2 auth".format(log_header,self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"]))
+
+        log_header = get_log_header(username, current_testbed)
+        admin_username = self.openstack_credentials[current_testbed]["username"]
+        auth_url = self.openstack_credentials[current_testbed]["auth_url"]
+        project = self.usersData[username]["destination_tenant"]
+        user_and_project_domain_name = self.openstack_credentials[current_testbed]["user_domain_name"]
+
+        if not password:
+            password = self.openstack_credentials[current_testbed]["password"]
+
+        if "nova" not in self.usersData[username]:
+            # clients (nova, neutron) have to be in the userdata, since openstack tenants are user bounded
+
+            if self.openstack_credentials[current_testbed]["api_version"] == 2:
+                logger.info("{}connecting to {} using v2 auth".format(log_header, auth_url))
                 OSloader = loading.get_plugin_loader('password')
-                OSauth = OSloader.load_from_options(
-                    auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
-                    username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
-                    password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
-                    #tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
-                    tenant_name=self.usersData[username]["destination_tenant"],
-                )
-                
-            if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==3:
-                logger.info("{}connecting to {} using v3 auth".format(log_header,self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"]))
-                OSauth = v3.Password(
-                    auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
-                    username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
-                    password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
-                    user_domain_name=self.openstack_credentials[self.usersData[username]["testbed"]]["user_domain_name"],
-                    #project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
-                    project_id=self.usersData[username]["destination_tenant"],
+                auth = OSloader.load_from_options(
+                    auth_url=auth_url,
+                    username=admin_username,
+                    password=password,
+                    # tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["admin_tenant_name"],
+                    tenant_name=project,
                 )
 
-            OSsession = session.Session(auth=OSauth)
-            
-            self.usersData[username]["nova"] = client.Client( 2, session=OSsession)
-            self.usersData[username]["neutron"] = nclient.Client(session=OSsession)
+            if self.openstack_credentials[current_testbed]["api_version"] == 3:
+                logger.info("{}connecting to {} using v3 auth".format(log_header, auth_url))
+
+                auth = v3.Password(
+                    auth_url=auth_url,
+                    username=admin_username,
+                    password=password,
+                    project_domain_name=user_and_project_domain_name,
+                    user_domain_name=user_and_project_domain_name,
+                    # project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
+                    project_id=project
+                )
+
+            os_session = session.Session(auth=auth)
+
+            self.usersData[username]["nova"] = client.Client(2, session=os_session)
+            self.usersData[username]["neutron"] = nclient.Client(session=os_session)
 
     def provide_resources(self, user_info, payload=None):
-        #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
+        # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
         # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
-        
+
         username = user_info.name
-        self.getOpenstack(username)
-        
+        self.get_openstack(username)
+
         extended_name = self.ZabbixServerName + "_" + username
-        
+
         current_testbed = self.usersData[username]["testbed"]
-        userNova = self.usersData[username]["nova"]
-        userNeutron = self.usersData[username]["neutron"]
-        lan_name= self.usersData[username]["lan_name"]
-        
-        log_header = get_log_header(username,current_testbed)
-        
+        user_nova = self.usersData[username]["nova"]
+        user_neutron = self.usersData[username]["neutron"]
+        lan_name = self.usersData[username]["lan_name"]
+
+        log_header = get_log_header(username, current_testbed)
+
         logger.info("{}preparing to create zabbix server".format(log_header))
-        
-        for s in userNova.servers.list():
 
-            if s.name==extended_name:
+        for s in user_nova.servers.list():
 
-                self.usersData[username]["serverInstance"]=s
-                self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
+            if s.name == extended_name:
+                self.usersData[username]["serverInstance"] = s
                 self.usersData[username]["internalIp"] = s.networks[lan_name][0]
-                self.usersData[username]["output"]={
-                    "testbed" : self.usersData[username]["testbed"],
-                    "internalIp" : self.usersData[username]["internalIp"],
-                    "floatingIpIp" : self.usersData[username]["floatingIp"],
-                    "url" : "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
-                    "username" : "Admin",
-                    "password" : "zabbix",
+                try:
+                    self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
+                except IndexError:
+                    pass
+
+                self.usersData[username]["output"] = {
+                    "testbed": self.usersData[username]["testbed"],
+                    "internalIp": self.usersData[username]["internalIp"],
+                    "floatingIp": self.usersData[username]["floatingIp"],
+                    "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
+                    "username": "Admin",
+                    "password": "zabbix",
                 }
                 logger.info("{}zabbix server already online".format(log_header))
                 logger.info(json.dumps(self.usersData[username]["output"]))
@@ -150,174 +164,205 @@ class MonitoringManager(AbstractManager):
 
         if self.usersData[username]["serverInstance"] is None:
             logger.info("{}no zabbix server found, preparing to create it".format(log_header))
-            NewServer = userNova.servers.create(
+            NewServer = user_nova.servers.create(
                 name=extended_name,
-                image=userNova.glance.find_image(self.ZabbixServerImageName),
-                flavor=userNova.flavors.find(name=self.ZabbixServerFlavour),
-                nics=[{'net-id': userNova.neutron.find_network(lan_name).id}],
+                image=user_nova.glance.find_image(self.ZabbixServerImageName),
+                flavor=user_nova.flavors.find(name=self.ZabbixServerFlavour),
+                nics=[{'net-id': user_nova.neutron.find_network(lan_name).id}],
                 security_groups=[self.ZabbixServerSecGroups],
             )
             id = NewServer.id
-            logger.info("{}zabbix server created, id is {}".format(log_header,id))
+            logger.info("{}zabbix server created, id is {}".format(log_header, id))
 
-            while 1:
-                NewServer = userNova.servers.get(id)
+            while True:
+                NewServer = user_nova.servers.get(id)
                 status = NewServer.status
-                logger.info("{}zabbix server status: {}".format(log_header,status))
+                logger.info("{}zabbix server status: {}".format(log_header, status))
                 if status != "BUILD":
                     break
                 time.sleep(0.3)
+                # TODO stop after a timeout
 
             self.usersData[username]["internalIp"] = NewServer.networks[lan_name][0]
 
             floatingIp_toAdd = None
-            flips = userNeutron.list_floatingips()
+            flips = user_neutron.list_floatingips()
             for ip in flips["floatingips"]:
-                if ip["fixed_ip_address"] == None:
+                if ip["fixed_ip_address"] is None:
+                    # TODO check if fip belongs to tenant!
                     floatingIp_toAdd = ip["floating_ip_address"]
                     break
 
-            if floatingIp_toAdd == None:
+            if floatingIp_toAdd is None:
                 body = {
                     "floatingip": {
-                        "floating_network_id": self.usersData[username]["nova"].neutron.find_network("public").id
+                        "floating_network_id": self.get_ext_network(username).get('id')
                     }}
-                userNeutron.create_floatingip(body=body)
-                flips = userNeutron.list_floatingips()
+                user_neutron.create_floatingip(body=body)
+                flips = user_neutron.list_floatingips()
                 for ip in flips["floatingips"]:
-                    if ip["fixed_ip_address"] == None:
+                    if ip["fixed_ip_address"] is None:
+                        # TODO check if fip belongs to tenant!
                         floatingIp_toAdd = ip["floating_ip_address"]
                         break
 
             if floatingIp_toAdd:
-                logger.info("{}adding floating ip {}".format(log_header,floatingIp_toAdd))
+                logger.info("{}adding floating ip {}".format(log_header, floatingIp_toAdd))
                 NewServer.add_floating_ip(floatingIp_toAdd)
-                NewServer = userNova.servers.get(id)
+                NewServer = user_nova.servers.get(id)
                 logger.info("{}floating ip added".format(log_header))
                 self.usersData[username]["floatingIp"] = floatingIp_toAdd
             else:
                 self.usersData[username]["floatingIp"] = "UNABLE TO ASSOCIATE"
 
             self.usersData[username]["serverInstance"] = NewServer
-            logger.info("{}zabbix deployed to {}".format(log_header,self.usersData[username]["serverInstance"].networks))
+            logger.info(
+                "{}zabbix deployed to {}".format(log_header, self.usersData[username]["serverInstance"].networks))
 
-            self.usersData[username]["output"]={
-                "testbed" : self.usersData[username]["testbed"],
-                "internalIp" : self.usersData[username]["internalIp"],
-                "floatingIpIp" : self.usersData[username]["floatingIp"],
-                "url" : "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
-                "username" : "Admin",
-                "password" : "zabbix",
-                }
-                
+            self.usersData[username]["output"] = {
+                "testbed": self.usersData[username]["testbed"],
+                "internalIp": self.usersData[username]["internalIp"],
+                "floatingIpIp": self.usersData[username]["floatingIp"],
+                "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
+                "username": "Admin",
+                "password": "zabbix",
+            }
+
             return [json.dumps(self.usersData[username]["output"])]
-            
+
         return {}
 
+    def get_ext_network(self, username):
+        # TODO check if the private net is attached to the router
+        external_nets = [ext_net for ext_net in self.usersData[username]["neutron"].list_networks()['networks'] if
+                         ext_net['router:external']]
+        if external_nets:
+            return external_nets[0]
+        else:
+            # TODO change to correct exception
+            raise MonitoringResourceValidationError("No external net found!")
+
     def validate_resources(self, user_info=None, payload=None) -> None:
-        print()
-        print()
         logger.info("***Requested*** validate_resources by user |%s|" % (user_info.name))
 
         if user_info.name == '':
-
-            raise MonitoringResourceValidationError(
-                message="user not configured as experimenter"
-            )
+            raise MonitoringResourceValidationError(message="user not configured as experimenter")
 
         try:
             resource = yaml.load(payload)
         except:
-            return
+            raise MonitoringResourceValidationError("Error parsing Yaml")
 
         testbed = resource.get("properties").get("testbed")
-        
+
         if testbed not in self.testbeds:
-            raise MonitoringResourceValidationError(
-                message="testbed not available"
-            )
-        
+            raise MonitoringResourceValidationError(message="testbed not available")
+
         lan_name = resource.get("properties").get("lan_name")
-        
+
         username = user_info.name
-        log_header = get_log_header(username,testbed)
-        
-        tenant_name=''
-        
-        tenant_name = user_info.testbed_tenants[TESTBED_MAPPING[testbed]]
-        
-        if tenant_name == '':
-            
-            if self.openstack_credentials[testbed]["api_version"]==2:
-                tenant_name = self.openstack_credentials[testbed]["tenant_name"]
-                logger.info("{}tenant name taken from v2 auth options, field tenant_name: {}".format(log_header,tenant_name))
-            if self.openstack_credentials[testbed]["api_version"]==3:
-                tenant_name = self.openstack_credentials[testbed]["project_id"]
-                logger.info("{}tenant name taken from v3 auth options, field project_id: {}".format(log_header,tenant_name))
+        log_header = get_log_header(username, testbed)
+
+        os_project_id = user_info.testbed_tenants[TESTBED_MAPPING[testbed]]
+
+        if not os_project_id:
+
+            if self.openstack_credentials[testbed]["api_version"] == 2:
+                os_project_id = self.openstack_credentials[testbed]["tenant_name"]
+                logger.info(
+                    "{}tenant name taken from v2 auth options, field tenant_name: {}".format(log_header, os_project_id))
+            if self.openstack_credentials[testbed]["api_version"] == 3:
+                os_project_id = self.openstack_credentials[testbed]["project_id"]
+                logger.info(
+                    "{}tenant name taken from v3 auth options, field project_id: {}".format(log_header, os_project_id))
         else:
-        
-            logger.info("{}tenant name taken from nfv-manager: {}".format(log_header,tenant_name))
-        
+
+            logger.info("{}tenant name taken from nfv-manager: {}".format(log_header, os_project_id))
+
         self.usersData[user_info.name] = {}
         self.usersData[user_info.name]["testbed"] = testbed
         self.usersData[user_info.name]["lan_name"] = lan_name
-        self.usersData[user_info.name]["destination_tenant"] = tenant_name
+        self.usersData[user_info.name]["destination_tenant"] = os_project_id
         self.usersData[user_info.name]["internalIp"] = None
         self.usersData[user_info.name]["floatingIp"] = None
         self.usersData[user_info.name]["serverInstance"] = None
 
     def release_resources(self, user_info, payload=None):
         logger.info("***Requested*** release_resources by user |%s|" % (user_info.name))
-        #logger.debug("Requested release_resources payload |%s|" % (payload))
+        # logger.debug("Requested release_resources payload |%s|" % (payload))
         username = user_info.name
-        resource = yaml.load(payload)
-        
-        current_testbed = self.usersData[username]["testbed"]
+
+        try:
+            resource = yaml.load(payload)
+        except:
+            logger.warning("Error parsing the resource to delete, i will return", username)
+            return
 
         try:
             testbed = resource.get("testbed")
         except:
-            logger.info("***ERROR*** release_resources |%s|" % (resource))
+            logger.info("***ERROR*** release_resources |%s|" % resource)
             return
 
         if testbed:
             if username not in self.usersData:
-                self.usersData[username]={}
-                self.usersData[username]["testbed"]=testbed
+                self.usersData[username] = {}
+                self.usersData[username]["testbed"] = testbed
 
-            log_header = get_log_header(username,testbed)
-            
+            log_header = get_log_header(username, testbed)
+
             logger.info("{}preparing to delete zabbix server".format(log_header))
-            
-            self.getOpenstack(username)
-            
+
+            self.get_openstack(username)
+
             extended_name = self.ZabbixServerName + "_" + username
             userNova = self.usersData[username]["nova"]
-            
+
             for s in userNova.servers.list():
-                if s.name==extended_name:
-                    self.usersData[username]["serverInstance"]=s
+                if s.name == extended_name:
+                    self.usersData[username]["serverInstance"] = s
                     break
             if self.usersData[username]["serverInstance"]:
-                logger.info("{}zabbix server to delete found: {}".format(log_header,extended_name))
+                logger.info("{}zabbix server to delete found: {}".format(log_header, extended_name))
                 self.usersData[username]["serverInstance"].delete()
                 logger.info("{}zabbix server deleted".format(log_header))
             else:
                 logger.info("{}zabbix server not found, nothing done".format(log_header))
-            
-            del(self.usersData[username])
-        
+
+            del (self.usersData[username])
+
         else:
             return
-            
+
     def _update_status(self) -> dict:
-        # logger.debug("_update_status")
         result = {}
         for exps in self.usersData.keys():
             if "output" in self.usersData[exps]:
-                #logger.debug(self.usersData[exps]["output"])
                 result[exps] = []
                 result[exps].append(json.dumps(self.usersData[exps]["output"]))
-                
-        #print (result)
+
         return result
+
+
+if __name__ == '__main__':
+    with open("/etc/softfire/openstack-credentials.json") as json_data:
+        openstack_credentials = json.load(json_data)
+    testbed_under_test = 'fokus'
+    project_id = "fcdaf143a95a4fada3f3fa9ee978ca8d"
+
+    auth = v3.Password(
+        auth_url=openstack_credentials.get(testbed_under_test).get("auth_url"),
+        username=openstack_credentials.get(testbed_under_test).get("username"),
+        password=openstack_credentials.get(testbed_under_test).get("password"),
+        project_domain_name=openstack_credentials.get(testbed_under_test).get("user_domain_name"),
+        user_domain_name=openstack_credentials.get(testbed_under_test).get("user_domain_name"),
+        project_id=project_id
+    )
+
+    os_session = session.Session(auth=auth)
+
+    nova = client.Client(2, session=os_session)
+    neutron = nclient.Client(session=os_session)
+    print(nova.servers.list())
+    for n in neutron.list_networks()['networks']:
+        print(n)
