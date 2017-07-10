@@ -312,8 +312,11 @@ class MonitoringManager(AbstractManager):
             log_header = get_log_header(username, testbed)
 
             logger.info("{}preparing to delete zabbix server".format(log_header))
-
-            self.get_openstack(username)
+            try:
+                self.get_openstack(username)
+            except KeyError:
+                logger.error("Not found username in userdata")
+                return
 
             extended_name = self.ZabbixServerName + "_" + username
             userNova = self.usersData[username]["nova"]
