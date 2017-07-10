@@ -222,7 +222,7 @@ class MonitoringManager(AbstractManager):
             self.usersData[username]["output"] = {
                 "testbed": self.usersData[username]["testbed"],
                 "internalIp": self.usersData[username]["internalIp"],
-                "floatingIpIp": self.usersData[username]["floatingIp"],
+                "floatingIp": self.usersData[username]["floatingIp"],
                 "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
                 "username": "Admin",
                 "password": "zabbix",
