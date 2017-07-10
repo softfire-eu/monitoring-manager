@@ -89,7 +89,8 @@ class MonitoringManager(AbstractManager):
                     auth_url=self.openstack_credentials[self.usersData[username]["testbed"]]["auth_url"],
                     username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
                     password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
-                    tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
+                    #tenant_name=self.openstack_credentials[self.usersData[username]["testbed"]]["tenant_name"],
+                    tenant_name=self.usersData[username]["destination_tenant"],
                 )
                 
             if self.openstack_credentials[self.usersData[username]["testbed"]]["api_version"]==3:
@@ -99,7 +100,8 @@ class MonitoringManager(AbstractManager):
                     username=self.openstack_credentials[self.usersData[username]["testbed"]]["username"],
                     password=self.openstack_credentials[self.usersData[username]["testbed"]]["password"],
                     user_domain_name=self.openstack_credentials[self.usersData[username]["testbed"]]["user_domain_name"],
-                    project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
+                    #project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
+                    project_id=self.usersData[username]["destination_tenant"],
                 )
 
             OSsession = session.Session(auth=OSauth)
@@ -236,10 +238,30 @@ class MonitoringManager(AbstractManager):
             )
         
         lan_name = resource.get("properties").get("lan_name")
-
+        
+        username = user_info.name
+        log_header = get_log_header(username,testbed)
+        
+        tenant_name=''
+        
+        tenant_name = user_info.testbed_tenants[TESTBED_MAPPING[testbed]]
+        
+        if tenant_name == '':
+            
+            if self.openstack_credentials[testbed]["api_version"]==2:
+                tenant_name = self.openstack_credentials[testbed]["tenant_name"]
+                logger.info("{}tenant name taken from v2 auth options, field tenant_name: {}".format(log_header,tenant_name))
+            if self.openstack_credentials[testbed]["api_version"]==3:
+                tenant_name = self.openstack_credentials[testbed]["project_id"]
+                logger.info("{}tenant name taken from v3 auth options, field project_id: {}".format(log_header,tenant_name))
+        else:
+        
+            logger.info("{}tenant name taken from nfv-manager: {}".format(log_header,tenant_name))
+        
         self.usersData[user_info.name] = {}
         self.usersData[user_info.name]["testbed"] = testbed
         self.usersData[user_info.name]["lan_name"] = lan_name
+        self.usersData[user_info.name]["destination_tenant"] = tenant_name
         self.usersData[user_info.name]["internalIp"] = None
         self.usersData[user_info.name]["floatingIp"] = None
         self.usersData[user_info.name]["serverInstance"] = None
