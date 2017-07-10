@@ -33,10 +33,8 @@ class MonitoringManager(AbstractManager):
             self.openstack_credentials = json.load(json_data)
             
         self.testbeds = []
-        self.connectionClients = {}
         for t in self.openstack_credentials.keys():
             self.testbeds.append(t)
-            self.connectionClients[t]={}
 
         self.usersData = {}
 
@@ -76,7 +74,7 @@ class MonitoringManager(AbstractManager):
         current_testbed = self.usersData[username]["testbed"]
         log_header = get_log_header(username,current_testbed)
         
-        if "nova" not in self.connectionClients[current_testbed]:
+        if "nova" not in self.usersData[username]:  #clients (nova, neutron) have to be in the userdata, since openstack tenants are user bounded
             
             from keystoneauth1 import loading
             from keystoneauth1 import session
@@ -106,24 +104,22 @@ class MonitoringManager(AbstractManager):
 
             OSsession = session.Session(auth=OSauth)
             
-            self.connectionClients[current_testbed]["nova"] = client.Client(
-                2, session=OSsession)
-                
-            self.connectionClients[current_testbed]["neutron"] = nclient.Client(session=OSsession)
+            self.usersData[username]["nova"] = client.Client( 2, session=OSsession)
+            self.usersData[username]["neutron"] = nclient.Client(session=OSsession)
 
     def provide_resources(self, user_info, payload=None):
         #logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
         # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         
-        
         username = user_info.name
         self.getOpenstack(username)
+        
         extended_name = self.ZabbixServerName + "_" + username
         
         current_testbed = self.usersData[username]["testbed"]
-        userNova = self.connectionClients[current_testbed]["nova"]
-        userNeutron = self.connectionClients[current_testbed]["neutron"]
+        userNova = self.usersData[username]["nova"]
+        userNeutron = self.usersData[username]["neutron"]
         lan_name= self.usersData[username]["lan_name"]
         
         log_header = get_log_header(username,current_testbed)
@@ -174,7 +170,6 @@ class MonitoringManager(AbstractManager):
 
             floatingIp_toAdd = None
             flips = userNeutron.list_floatingips()
-            #random.shuffle(flips["floatingips"])
             for ip in flips["floatingips"]:
                 if ip["fixed_ip_address"] == None:
                     floatingIp_toAdd = ip["floating_ip_address"]
@@ -256,11 +251,7 @@ class MonitoringManager(AbstractManager):
         resource = yaml.load(payload)
         
         current_testbed = self.usersData[username]["testbed"]
-        if "nova" not in self.connectionClients[current_testbed]:
-            return
-            
-        userNova = self.connectionClients[current_testbed]["nova"]
-        userNeutron = self.connectionClients[current_testbed]["neutron"]
+
         try:
             testbed = resource.get("testbed")
         except:
@@ -279,6 +270,7 @@ class MonitoringManager(AbstractManager):
             self.getOpenstack(username)
             
             extended_name = self.ZabbixServerName + "_" + username
+            userNova = self.usersData[username]["nova"]
             
             for s in userNova.servers.list():
                 if s.name==extended_name:
