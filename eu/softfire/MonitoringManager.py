@@ -30,6 +30,14 @@ class UpdateStatusThread(Thread):
         self.stopped = True
 
 
+def get_network_by_name(lan_name, neutron, project_id):
+    for net in neutron.list_networks()['networks']:
+        if net.get('name') == lan_name and net.get('project_id') == project_id:
+            return net
+    # TODO create the network!
+    raise MonitoringResourceValidationError("No network called: %s" % lan_name)
+
+
 class MonitoringManager(AbstractManager):
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
@@ -121,9 +129,7 @@ class MonitoringManager(AbstractManager):
             self.usersData[username]["neutron"] = nclient.Client(session=os_session)
 
     def provide_resources(self, user_info, payload=None):
-        # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
         logger.info("***Requested*** provide_resources by user |%s|" % (user_info.name))
-        # logger.debug("user_info: type: %s, %s" % (type(user_info), user_info))
 
         username = user_info.name
         self.get_openstack(username)
@@ -134,6 +140,7 @@ class MonitoringManager(AbstractManager):
         user_nova = self.usersData[username]["nova"]
         user_neutron = self.usersData[username]["neutron"]
         lan_name = self.usersData[username]["lan_name"]
+        project_id = self.usersData[username]["destination_tenant"]
 
         log_header = get_log_header(username, current_testbed)
 
@@ -164,36 +171,39 @@ class MonitoringManager(AbstractManager):
 
         if self.usersData[username]["serverInstance"] is None:
             logger.info("{}no zabbix server found, preparing to create it".format(log_header))
-            NewServer = user_nova.servers.create(
+            new_server = user_nova.servers.create(
                 name=extended_name,
                 image=user_nova.glance.find_image(self.ZabbixServerImageName),
                 flavor=user_nova.flavors.find(name=self.ZabbixServerFlavour),
-                nics=[{'net-id': user_nova.neutron.find_network(lan_name).id}],
+                nics=[{'net-id': get_network_by_name(lan_name, user_neutron, project_id).get('id')}],
                 security_groups=[self.ZabbixServerSecGroups],
             )
-            id = NewServer.id
+            id = new_server.id
             logger.info("{}zabbix server created, id is {}".format(log_header, id))
 
             while True:
-                NewServer = user_nova.servers.get(id)
-                status = NewServer.status
+                new_server = user_nova.servers.get(id)
+                status = new_server.status
                 logger.info("{}zabbix server status: {}".format(log_header, status))
                 if status != "BUILD":
                     break
                 time.sleep(0.3)
                 # TODO stop after a timeout
 
-            self.usersData[username]["internalIp"] = NewServer.networks[lan_name][0]
+            self.usersData[username]["internalIp"] = new_server.networks[lan_name][0]
 
-            floatingIp_toAdd = None
+            floating_ip_to_add = None
             flips = user_neutron.list_floatingips()
             for ip in flips["floatingips"]:
-                if ip["fixed_ip_address"] is None:
-                    # TODO check if fip belongs to tenant!
-                    floatingIp_toAdd = ip["floating_ip_address"]
+                if hasattr(ip, "project_id"):
+                    ip_project_id_ = ip['project_id']
+                else:
+                    ip_project_id_ = ip['tenant_id']
+                if ip["fixed_ip_address"] is None and ip_project_id_ == self.usersData[username]["destination_tenant"]:
+                    floating_ip_to_add = ip["floating_ip_address"]
                     break
 
-            if floatingIp_toAdd is None:
+            if floating_ip_to_add is None:
                 body = {
                     "floatingip": {
                         "floating_network_id": self.get_ext_network(username).get('id')
@@ -203,19 +213,19 @@ class MonitoringManager(AbstractManager):
                 for ip in flips["floatingips"]:
                     if ip["fixed_ip_address"] is None:
                         # TODO check if fip belongs to tenant!
-                        floatingIp_toAdd = ip["floating_ip_address"]
+                        floating_ip_to_add = ip["floating_ip_address"]
                         break
 
-            if floatingIp_toAdd:
-                logger.info("{}adding floating ip {}".format(log_header, floatingIp_toAdd))
-                NewServer.add_floating_ip(floatingIp_toAdd)
-                NewServer = user_nova.servers.get(id)
+            if floating_ip_to_add:
+                logger.info("{}adding floating ip {}".format(log_header, floating_ip_to_add))
+                new_server.add_floating_ip(floating_ip_to_add)
+                new_server = user_nova.servers.get(id)
                 logger.info("{}floating ip added".format(log_header))
-                self.usersData[username]["floatingIp"] = floatingIp_toAdd
+                self.usersData[username]["floatingIp"] = floating_ip_to_add
             else:
                 self.usersData[username]["floatingIp"] = "UNABLE TO ASSOCIATE"
 
-            self.usersData[username]["serverInstance"] = NewServer
+            self.usersData[username]["serverInstance"] = new_server
             logger.info(
                 "{}zabbix deployed to {}".format(log_header, self.usersData[username]["serverInstance"].networks))
 
@@ -369,3 +379,6 @@ if __name__ == '__main__':
     print(nova.servers.list())
     for n in neutron.list_networks()['networks']:
         print(n)
+    print()
+    for ip in neutron.list_floatingips()['floatingips']:
+        print(ip)
