@@ -6,28 +6,26 @@ It will then work when installed in site-packages on a target system
 where the runner script is in /usr/bin (or wherever)
 """
 from sdk.softfire.main import start_manager
-from eu.softfire.MonitoringManager import MonitoringManager, UpdateStatusThread
-#from eu.softfire.Api import Api
 
-import asyncio
-import os
-from concurrent.futures import ProcessPoolExecutor
+from eu.softfire.MonitoringManager import MonitoringManager
 from eu.softfire.utils.monitoring.utils import config_path
 
+
+# from eu.softfire.Api import Api
+
 def start():
-    #os.environ["http_proxy"] = "http://"
-    #print(os.environ["http_proxy"])
-    #print(os.environ["no_proxy"])
-    #mon_manager = MonitoringManager(get_logger("eu.softfire.monitoring-manager"))
-    #executor = ProcessPoolExecutor(1)
+    # os.environ["http_proxy"] = "http://"
+    # print(os.environ["http_proxy"])
+    # print(os.environ["no_proxy"])
+    # mon_manager = MonitoringManager(get_logger("eu.softfire.monitoring-manager"))
+    # executor = ProcessPoolExecutor(1)
     mon_manager = MonitoringManager(config_path)
-    thread = UpdateStatusThread(mon_manager)
-    thread.start()
+    # thread = UpdateStatusThread(mon_manager)
+    # thread.start()
 
     start_manager(mon_manager)
-    #asyncio.ensure_future(loop.run_in_executor(executor, Api.start))
+    # asyncio.ensure_future(loop.run_in_executor(executor, Api.start))
 
 
 if __name__ == '__main__':
     start()
-
