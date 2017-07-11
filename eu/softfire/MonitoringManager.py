@@ -7,7 +7,6 @@ from keystoneauth1.identity import v3
 from neutronclient.v2_0 import client as nclient
 from novaclient import client
 from novaclient.exceptions import NotFound
-
 from sdk.softfire.manager import AbstractManager
 
 from eu.softfire.exceptions.monitoring.exceptions import *
@@ -173,14 +172,14 @@ class MonitoringManager(AbstractManager):
 
         if self.usersData[username]["serverInstance"] is None:
             logger.info("{}no zabbix server found, preparing to create it".format(log_header))
-            
+
             try:
                 zabbix_destination_network = user_nova.neutron.find_network(lan_name)
             except NotFound:
                 zabbix_destination_network = None
 
             if zabbix_destination_network:
-                logger.info("{}network found {}".format(log_header,zabbix_destination_network))
+                logger.info("{}network found {}".format(log_header, zabbix_destination_network))
             else:
                 logger.info("{}network not found, trying to create it".format(log_header))
 
@@ -208,10 +207,13 @@ class MonitoringManager(AbstractManager):
             floating_ip_to_add = None
             flips = user_neutron.list_floatingips()
             for ip in flips["floatingips"]:
-                if hasattr(ip, "project_id"):
+                if hasattr(ip, "project_id") and ip['project_id']:
                     ip_project_id_ = ip['project_id']
                 else:
                     ip_project_id_ = ip['tenant_id']
+                logger.debug("Floating Ip belongs to %s (== %s)" % (
+                    ip_project_id_, self.usersData[username]["destination_tenant"]
+                ))
                 if ip["fixed_ip_address"] is None and ip_project_id_ == self.usersData[username]["destination_tenant"]:
                     floating_ip_to_add = ip["floating_ip_address"]
                     break
