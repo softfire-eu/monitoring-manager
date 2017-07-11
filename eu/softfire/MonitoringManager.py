@@ -210,17 +210,18 @@ class MonitoringManager(AbstractManager):
                 }
                 logger.info("{}Creating subnet subnet_{}".format(log_header,lan_name))
                 subnet = user_neutron.create_subnet(body=kwargs)
-
-
-                #router = self.get_router_from_name(router_name, ext_net)
-                #router_id = router['router']['id']
-                # body_value = {
-                    # 'subnet_id': subnet['id'],
-                # }
-                
-                # user_neutron.add_interface_router(router=router_id, body=body_value)
+                logger.info("{}Created subnet {}".format(log_header,subnet))
 
             
+                router = get_router_from_name(user_neutron,router_name, self.get_ext_network(username).get('id'))
+                router_id = router['router']['id']
+                body_value = {
+                     'subnet_id': subnet["subnets"][0]['id'],
+                }
+                
+                user_neutron.add_interface_router(router=router_id, body=body_value)
+
+                logger.info("{}network successfully created and configured".format(log_header))
                 
                 
             

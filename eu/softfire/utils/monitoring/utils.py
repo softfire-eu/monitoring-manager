@@ -16,4 +16,14 @@ def get_log_header(username,current_testbed):
     return "{}@{} - ".format(username,current_testbed)
 
 def get_username_hash(username):
-    return abs(hash(username))   
+    return abs(hash(username))
+
+def get_router_from_name(user_neutron, router_name, ext_net_id):
+        for router in user_neutron.list_routers()['routers']:
+            if router['name'] == router_name:
+                return user_neutron.show_router(router['id'])
+        request = {'router': {'name': router_name, 'admin_state_up': True}}
+        router = user_neutron.create_router(request)
+        body_value = {"network_id": ext_net_id}
+        user_neutron.add_gateway_router(router=router['router']['id'], body=body_value)
+        return router
