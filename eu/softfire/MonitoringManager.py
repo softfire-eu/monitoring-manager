@@ -182,7 +182,48 @@ class MonitoringManager(AbstractManager):
                 logger.info("{}network found {}".format(log_header, zabbix_destination_network))
             else:
                 logger.info("{}network not found, trying to create it".format(log_header))
+            
+                router_name='ob_router'
+                kwargs = {'network': {
+                            'name': lan_name,
+                            'shared': False,
+                            'admin_state_up': True
+                }}
+                logger.info("{}Creating net {}".format(log_header,lan_name))
 
+                network_ = user_neutron.create_network(body=kwargs)['network']
+                
+                logger.info("{} net created {}".format(log_header,network_))
+
+                kwargs = {
+                    'subnets': [
+                        {
+                            'name': "subnet_%s" % lan_name,
+                            'cidr': "192.%s.%s.0/24" % ((get_username_hash(username) % 254) + 1, 1),
+                            'gateway_ip': '192.%s.%s.1' % ((get_username_hash(username) % 254) + 1, 1),
+                            'ip_version': '4',
+                            'enable_dhcp': True,
+                            'dns_nameservers': ['8.8.8.8'],
+                            'network_id': network_['id']
+                        }
+                    ]
+                }
+                logger.info("{}Creating subnet subnet_{}".format(log_header,lan_name))
+                subnet = user_neutron.create_subnet(body=kwargs)
+
+
+                #router = self.get_router_from_name(router_name, ext_net)
+                #router_id = router['router']['id']
+                # body_value = {
+                    # 'subnet_id': subnet['id'],
+                # }
+                
+                # user_neutron.add_interface_router(router=router_id, body=body_value)
+
+            
+                
+                
+            
             new_server = user_nova.servers.create(
                 name=extended_name,
                 image=user_nova.glance.find_image(self.ZabbixServerImageName),

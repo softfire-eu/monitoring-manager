@@ -14,3 +14,6 @@ def random_string(size):
 
 def get_log_header(username,current_testbed):
     return "{}@{} - ".format(username,current_testbed)
+
+def get_username_hash(username):
+    return abs(hash(username))   
