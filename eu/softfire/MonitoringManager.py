@@ -74,7 +74,7 @@ class MonitoringManager(AbstractManager):
         # logger.debug("List resources")
         resource_id = "monitor"
         description = "This resource permits to deploy a ZabbixServer"
-        cardinality = 1
+        cardinality = 10
         testbed = messages_pb2.ANY
         node_type = "MonitoringResource"
         result = []
