@@ -32,7 +32,7 @@ class UpdateStatusThread(Thread):
 
 def get_network_by_name(lan_name, neutron, project_id):
     for net in neutron.list_networks()['networks']:
-        if net.get('name') == lan_name and net.get('project_id') == project_id:
+        if net.get('name') == lan_name and (net.get('project_id') == project_id or net.get('shared')):
             return net
     # TODO create the network!
     raise MonitoringResourceValidationError("No network called: %s" % lan_name)
