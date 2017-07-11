@@ -24,23 +24,7 @@ setup(
     url="http://softfire.eu/",
     packages=find_packages(),
     scripts=["monitoring-manager"],
-    # install_requires=[
-        # 'bottle==0.12.13',
-        # 'bottle-cork',
-        # 'softfire-sdk',
-        # 'pyyaml',
-        # 'pbr==3.1.1',
-        # 'oslo.utils==3.26.0',
-        # 'oslo.i18n==3.15.3',
-        # 'oslo.serialization==1.10.0',
-        # 'keystoneauth1==2.21.0',
-        # 'debtcollector==1.15.0',
-        # 'stevedore==1.23.0',
-        # 'python-novaclient',
-    # ],    
-    
     install_requires=[
-        'bottle-cork',
         'softfire-sdk',
         'pyyaml',
         'python-novaclient',
@@ -50,6 +34,5 @@ setup(
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
-
     ],
 )
