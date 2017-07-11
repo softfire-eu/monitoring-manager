@@ -6,6 +6,8 @@ from keystoneauth1 import session
 from keystoneauth1.identity import v3
 from neutronclient.v2_0 import client as nclient
 from novaclient import client
+from novaclient.exceptions import NotFound
+
 from sdk.softfire.manager import AbstractManager
 
 from eu.softfire.exceptions.monitoring.exceptions import *
@@ -171,6 +173,17 @@ class MonitoringManager(AbstractManager):
 
         if self.usersData[username]["serverInstance"] is None:
             logger.info("{}no zabbix server found, preparing to create it".format(log_header))
+            
+            try:
+                zabbix_destination_network = user_nova.neutron.find_network(lan_name)
+            except NotFound:
+                zabbix_destination_network = None
+
+            if zabbix_destination_network:
+                logger.info("{}network found {}".format(log_header,zabbix_destination_network))
+            else:
+                logger.info("{}network not found, trying to create it".format(log_header))
+
             new_server = user_nova.servers.create(
                 name=extended_name,
                 image=user_nova.glance.find_image(self.ZabbixServerImageName),
