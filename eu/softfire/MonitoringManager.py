@@ -39,6 +39,22 @@ def get_network_by_name(lan_name, neutron, project_id):
     raise MonitoringResourceValidationError("No network called: %s" % lan_name)
 
 
+def list_sec_grops(neutron, os_project_id):
+    return [sec.get('name') for sec in neutron.list_security_groups()['security_groups'] if
+            (sec.get('tenant_id') is not None and sec.get('tenant_id') == os_project_id) or (
+                sec.get('project_id') is not None and sec.get('project_id') == os_project_id)]
+
+
+def get_sec_groups(sec_grops_names: list, neutron, os_project_id):
+    result = []
+    available_sec_groups = list_sec_grops(neutron, os_project_id)
+    for sg_name in sec_grops_names:
+        if sg_name in available_sec_groups:
+            result.append(sg_name)
+    # TODO create non existing ones!!
+    return result
+
+
 class MonitoringManager(AbstractManager):
     def __init__(self, config_path):
         super(MonitoringManager, self).__init__(config_path)
@@ -56,7 +72,7 @@ class MonitoringManager(AbstractManager):
         self.ZabbixServerName = self.get_config_value("openstack-params", "instance_name", "")
         self.ZabbixServerFlavour = self.get_config_value("openstack-params", "flavour", "")
         self.ZabbixServerImageName = self.get_config_value("openstack-params", "image_name", "")
-        self.ZabbixServerSecGroups = self.get_config_value("openstack-params", "security_group", "")
+        self.ZabbixServerSecGroups = self.get_config_value("openstack-params", "security_group", "").split(";")
 
     def create_user(self, username, password):
         user_info = messages_pb2.UserInfo(
@@ -230,7 +246,7 @@ class MonitoringManager(AbstractManager):
                 image=user_nova.glance.find_image(self.ZabbixServerImageName),
                 flavor=user_nova.flavors.find(name=self.ZabbixServerFlavour),
                 nics=[{'net-id': get_network_by_name(lan_name, user_neutron, project_id).get('id')}],
-                security_groups=[self.ZabbixServerSecGroups],
+                security_groups=get_sec_groups(self.ZabbixServerSecGroups, user_neutron, project_id)
             )
             id = new_server.id
             logger.info("{}zabbix server created, id is {}".format(log_header, id))
