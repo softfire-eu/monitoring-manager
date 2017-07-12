@@ -5,3 +5,6 @@ class _BaseException(Exception):
 
 class MonitoringResourceValidationError(_BaseException):
     pass
+
+class MonitoringResourceProvisioningError(_BaseException):
+    pass

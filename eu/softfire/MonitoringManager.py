@@ -35,7 +35,6 @@ def get_network_by_name(lan_name, neutron, project_id):
     for net in neutron.list_networks()['networks']:
         if net.get('name') == lan_name and (net.get('project_id') == project_id or net.get('shared')):
             return net
-    # TODO create the network!
     raise MonitoringResourceValidationError("No network called: %s" % lan_name)
 
 
@@ -252,6 +251,7 @@ class MonitoringManager(AbstractManager):
             logger.info("{}zabbix server created, id is {}".format(log_header, id))
 
             while True:
+            
                 new_server = user_nova.servers.get(id)
                 status = new_server.status
                 logger.info("{}zabbix server status: {}".format(log_header, status))
@@ -322,8 +322,7 @@ class MonitoringManager(AbstractManager):
         if external_nets:
             return external_nets[0]
         else:
-            # TODO change to correct exception
-            raise MonitoringResourceValidationError("No external net found!")
+            raise MonitoringResourceProvisioningError("No external net found!")
 
     def validate_resources(self, user_info=None, payload=None) -> None:
         logger.info("***Requested*** validate_resources by user |%s|" % (user_info.name))
