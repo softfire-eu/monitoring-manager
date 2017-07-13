@@ -250,7 +250,7 @@ class MonitoringManager(AbstractManager):
             id = new_server.id
             logger.info("{}zabbix server created, id is {}".format(log_header, id))
             
-            openstack_build_timeout = float(self.get_config_value('system', 'openstack_build_timeout', 60.0)) #seconds
+            openstack_build_timeout = float(self.get_config_value('system', 'openstack_build_timeout', 240.0)) #seconds
             wait_quantum = 0.3 #seconds
             current_attempt = 0
             max_attempts = openstack_build_timeout / wait_quantum
