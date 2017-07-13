@@ -291,10 +291,18 @@ class MonitoringManager(AbstractManager):
                         "floating_network_id": self.get_ext_network(username).get('id')
                     }}
                 user_neutron.create_floatingip(body=body)
+                
                 flips = user_neutron.list_floatingips()
+                
                 for ip in flips["floatingips"]:
-                    if ip["fixed_ip_address"] is None:
-                        # TODO check if fip belongs to tenant!
+                    if hasattr(ip, "project_id") and ip['project_id']:
+                        ip_project_id_ = ip['project_id']
+                    else:
+                        ip_project_id_ = ip['tenant_id']
+                    logger.debug("Floating Ip belongs to %s (== %s)" % (
+                        ip_project_id_, self.usersData[username]["destination_tenant"]
+                    ))
+                    if ip["fixed_ip_address"] is None and ip_project_id_ == self.usersData[username]["destination_tenant"]:
                         floating_ip_to_add = ip["floating_ip_address"]
                         break
 
