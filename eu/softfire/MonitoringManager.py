@@ -299,7 +299,7 @@ class MonitoringManager(AbstractManager):
                         ip_project_id_ = ip['project_id']
                     else:
                         ip_project_id_ = ip['tenant_id']
-                    logger.debug("Floating Ip belongs to %s (== %s)" % (
+                    logger.debug("New floating Ip belongs to %s (== %s)" % (
                         ip_project_id_, self.usersData[username]["destination_tenant"]
                     ))
                     if ip["fixed_ip_address"] is None and ip_project_id_ == self.usersData[username]["destination_tenant"]:
