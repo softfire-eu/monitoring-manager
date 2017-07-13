@@ -249,16 +249,25 @@ class MonitoringManager(AbstractManager):
             )
             id = new_server.id
             logger.info("{}zabbix server created, id is {}".format(log_header, id))
-
+            
+            openstack_build_timeout = float(self.get_config_value('system', 'openstack_build_timeout', 60.0)) #seconds
+            wait_quantum = 0.3 #seconds
+            current_attempt = 0
+            max_attempts = openstack_build_timeout / wait_quantum
+            
             while True:
             
                 new_server = user_nova.servers.get(id)
                 status = new_server.status
-                logger.info("{}zabbix server status: {}".format(log_header, status))
+                logger.info("{}zabbix attempt {} server status: {}".format(log_header, current_attempt, status))
                 if status != "BUILD":
                     break
-                time.sleep(0.3)
-                # TODO stop after a timeout
+                time.sleep(wait_quantum)
+                current_attempt += 1
+                
+                if current_attempt>max_attempts:
+                    raise MonitoringResourceProvisioningError(message="Timeout in openstack server building process")
+
 
             self.usersData[username]["internalIp"] = new_server.networks[lan_name][0]
 
