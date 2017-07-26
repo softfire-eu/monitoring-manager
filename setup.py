@@ -28,6 +28,9 @@ setup(
         'softfire-sdk',
         'pyyaml',
         'python-novaclient',
+        'python-keystoneclient',
+        'python-neutronclient',
+        'python-glanceclient',
     ],
     long_description=read('README.rst'),
     classifiers=[
