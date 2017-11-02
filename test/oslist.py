@@ -13,13 +13,11 @@ loader = loading.get_plugin_loader('password')
 if 0:
     auth = loader.load_from_options(auth_url="http://10.44.56.250:5000/v2.0/",
         username="admin",
-        password="8xCYSLx7",
         tenant_name="Zabbix_Test"
         )
 if 1:
     auth = v3.Password(auth_url="http://10.44.56.250:5000/v3/",
         username="admin",
-        password="8xCYSLx7",
         user_domain_name="Default",
         #project_id="fed0b52c7e034d5785880613e78d4411",
         project_id="af81bd469ef64f53a0ddf8e070482382",
