@@ -107,7 +107,8 @@ class MonitoringManager(AbstractManager):
         admin_username = self.openstack_credentials[current_testbed]["username"]
         auth_url = self.openstack_credentials[current_testbed]["auth_url"]
         project = self.usersData[username]["destination_tenant"]
-        user_and_project_domain_name = self.openstack_credentials[current_testbed]["user_domain_name"]
+        user_and_project_domain_name = self.openstack_credentials[current_testbed]["project_domain_name"]
+        user_domain_id = self.openstack_credentials[current_testbed]["user_domain_id"]
 
         if not password:
             password = self.openstack_credentials[current_testbed]["password"]
@@ -134,7 +135,7 @@ class MonitoringManager(AbstractManager):
                     username=admin_username,
                     password=password,
                     project_domain_name=user_and_project_domain_name,
-                    user_domain_name=user_and_project_domain_name,
+                    user_domain_id=user_domain_id,
                     # project_id=self.openstack_credentials[self.usersData[username]["testbed"]]["project_id"],
                     project_id=project
                 )
