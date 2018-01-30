@@ -25,7 +25,7 @@ setup(
     packages=find_packages(),
     scripts=["monitoring-manager"],
     install_requires=[
-        'softfire-sdk',
+        'softfire-sdk==1.1.4',
         'pyyaml',
         'python-novaclient',
         'python-keystoneclient',
