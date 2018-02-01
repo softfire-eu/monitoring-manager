@@ -15,7 +15,7 @@ def read(fname):
 
 setup(
     name="monitoring-manager",
-    version="0.4.1",
+    version="0.5.0",
     author="SoftFIRE",
     author_email="softfire@softfire.eu",
     description="The SoftFIRE Monitoring Manager",
@@ -34,7 +34,7 @@ setup(
     ],
     long_description=read('README.rst'),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
     ],
