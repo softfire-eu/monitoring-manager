@@ -34,7 +34,7 @@ setup(
     ],
     long_description=read('README.rst'),
     classifiers=[
-        "Development Status :: 5 - Beta",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
     ],
