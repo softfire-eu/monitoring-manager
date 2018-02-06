@@ -27,7 +27,7 @@ setup(
     install_requires=[
         'softfire-sdk==1.1.4',
         'pyyaml',
-        'python-novaclient',
+        'python-novaclient==9.1.1',
         'python-keystoneclient',
         'python-neutronclient',
         'python-glanceclient',
