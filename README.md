@@ -9,19 +9,28 @@ The Monitoring Manager provides proper resources to experimenters requiring moni
 
 ### Monitoring resource
 
-The MonitoringResource node type is defined as follows, as per node types page: node_types:
+The MonitoringResource node type is defined as follows:
 
+```yaml
 MonitoringResource:
   derived_from: eu.softfire.BaseResource
   description: "Defines the Zabbix monitoring resource requested"
   properties:
     testbed:
       type: string
-      required: false
+      required: true
       description: "Location where to deploy the monitoring server"
-This node type has a single property:
+    lan_name:
+      type: string
+      required: true
+      description: "Openstack lan name where to deploy the monitoring server"
+```
 
-testbed: in case the experimenter requires deployment of VMs on more than one testbed is it possible to define on which testbed the Zabbix Server VM will be deployed
+This node type has two properties:
+
+* **testbed**: in case the experimenter requires deployment of VMs on more than one testbed is it possible to define on which testbed the Zabbix Server VM will be deployed
+
+* **lan_name**: it possible to define on which Openstack lan the Zabbix Server VM will be deployed
 
 ## Technical Requirements
 
