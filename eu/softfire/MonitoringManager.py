@@ -180,6 +180,7 @@ class MonitoringManager(AbstractManager):
                     "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
                     "username": "Admin",
                     "password": "zabbix",
+                    'vm_id': self.usersData.get(username).get('serverInstance').id
                 }
                 logger.info("{}zabbix server already online".format(log_header))
                 logger.info(json.dumps(self.usersData[username]["output"]))
@@ -327,6 +328,7 @@ class MonitoringManager(AbstractManager):
                 "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
                 "username": "Admin",
                 "password": "zabbix",
+                'vm_id': self.usersData.get(username).get('serverInstance').id
             }
 
             return [json.dumps(self.usersData[username]["output"])]
