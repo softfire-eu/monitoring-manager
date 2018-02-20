@@ -15,7 +15,7 @@ def read(fname):
 
 setup(
     name="monitoring-manager",
-    version="0.5.0",
+    version="0.5.1",
     author="SoftFIRE",
     author_email="softfire@softfire.eu",
     description="The SoftFIRE Monitoring Manager",
