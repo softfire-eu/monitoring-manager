@@ -14,6 +14,6 @@ COPY etc/monitoring-manager.ini /etc/softfire/
 COPY etc/openstack-credentials.json /etc/softfire/ 
 COPY . /app
 
-EXPOSE 5051
+EXPOSE 50059
 
 CMD ./monitoring-manager
