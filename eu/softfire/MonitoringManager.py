@@ -163,33 +163,8 @@ class MonitoringManager(AbstractManager):
 
         logger.info("{}preparing to create zabbix server".format(log_header))
 
-        for s in user_nova.servers.list():
-
-            if s.name == extended_name:
-                self.usersData[username]["serverInstance"] = s
-                self.usersData[username]["internalIp"] = s.networks[lan_name][0]
-                try:
-                    self.usersData[username]["floatingIp"] = s.networks[lan_name][1]
-                except IndexError:
-                    pass
-
-                self.usersData[username]["output"] = {
-                    "testbed": self.usersData[username]["testbed"],
-                    "internalIp": self.usersData[username]["internalIp"],
-                    "floatingIp": self.usersData[username]["floatingIp"],
-                    "url": "http://{}/zabbix/".format(self.usersData[username]["floatingIp"]),
-                    "username": "Admin",
-                    "password": "zabbix",
-                    'vm_id': self.usersData.get(username).get('serverInstance').id
-                }
-                logger.info("{}zabbix server already online".format(log_header))
-                logger.info(json.dumps(self.usersData[username]["output"]))
-                return [json.dumps(self.usersData[username]["output"])]
-                break
-
         if self.usersData[username]["serverInstance"] is None:
-            logger.info("{}no zabbix server found, preparing to create it".format(log_header))
-
+        
             try:
                 zabbix_destination_network = user_nova.neutron.find_network(lan_name)
             except NotFound:
@@ -420,21 +395,22 @@ class MonitoringManager(AbstractManager):
                 logger.error("Not found username in userdata")
                 return
 
-            extended_name = self.ZabbixServerName + "_" + username
+            id_to_be_deleted = testbed = resource.get("vm_id")
+            
             userNova = self.usersData[username]["nova"]
 
             for s in userNova.servers.list():
-                if s.name == extended_name:
+                if s.id == id_to_be_deleted:
                     self.usersData[username]["serverInstance"] = s
                     break
             if self.usersData[username]["serverInstance"]:
-                logger.info("{}zabbix server to delete found: {}".format(log_header, extended_name))
+                logger.info("{}zabbix server to delete found: {} {}".format(log_header, s.id, s.name))
                 self.usersData[username]["serverInstance"].delete()
                 logger.info("{}zabbix server deleted".format(log_header))
             else:
                 logger.info("{}zabbix server not found, nothing done".format(log_header))
 
-            del (self.usersData[username])
+            self.usersData[username]["serverInstance"] = None
 
         else:
             return
