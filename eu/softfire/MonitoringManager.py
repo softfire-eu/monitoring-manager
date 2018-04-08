@@ -9,6 +9,8 @@ from novaclient import client
 from novaclient.exceptions import NotFound
 from sdk.softfire.manager import AbstractManager
 
+from neutronclient.common.exceptions import BadRequest
+
 from eu.softfire.exceptions.monitoring.exceptions import *
 from eu.softfire.utils.monitoring.utils import *
 
@@ -171,11 +173,11 @@ class MonitoringManager(AbstractManager):
                 zabbix_destination_network = None
 
             if zabbix_destination_network:
-                logger.info("{}network found {}".format(log_header, zabbix_destination_network))
+                logger.info("{}network found {}".format(log_header, zabbix_destination_network.to_dict()))
+                net_id = zabbix_destination_network.id
             else:
                 logger.info("{}network not found, trying to create it".format(log_header))
             
-                router_name='ob_router'
                 kwargs = {'network': {
                             'name': lan_name,
                             'shared': False,
@@ -183,10 +185,20 @@ class MonitoringManager(AbstractManager):
                 }}
                 logger.info("{}Creating net {}".format(log_header,lan_name))
 
-                network_ = user_neutron.create_network(body=kwargs)['network']
+                zabbix_destination_network = user_neutron.create_network(body=kwargs)['network']
                 
-                logger.info("{} net created {}".format(log_header,network_))
+                logger.info("{} net created {}".format(log_header,zabbix_destination_network))
+                net_id = zabbix_destination_network['id']
+            
+            subnet_id = None
 
+            for s in user_neutron.list_subnets()["subnets"]:
+                if s["network_id"]==net_id:
+                    if s["name"]=="subnet_%s" % lan_name:
+                        subnet_id=s["id"]
+            
+            if subnet_id==None:
+                logger.info("{}Creating subnet subnet_{}".format(log_header,lan_name))
                 kwargs = {
                     'subnets': [
                         {
@@ -195,27 +207,51 @@ class MonitoringManager(AbstractManager):
                             'gateway_ip': '192.%s.%s.1' % ((get_username_hash(username) % 254) + 1, 1),
                             'ip_version': '4',
                             'enable_dhcp': True,
-                            'dns_nameservers': ['8.8.8.8'],
-                            'network_id': network_['id']
+                            'network_id': net_id
                         }
                     ]
                 }
-                logger.info("{}Creating subnet subnet_{}".format(log_header,lan_name))
-                subnet = user_neutron.create_subnet(body=kwargs)
-                logger.info("{}Created subnet {}".format(log_header,subnet))
-
+                
+                try:
+                    subnet = user_neutron.create_subnet(body=kwargs)
+                    logger.info("{}Created subnet {}".format(log_header,subnet))
+                    
+                    for s in user_neutron.list_subnets()["subnets"]:
+                        if s["network_id"]==net_id:
+                            if s["name"]=="subnet_%s" % lan_name:
+                                subnet_id=s["id"]
+                                
+                except Exception as e:
+                    logger.info("{}subnet NOT Created".format(log_header))
+                    import traceback
+                    logger.error("Error: {}".format(traceback.format_exc()))
+            else:    
+                    logger.info("{}subnet already present".format(log_header))
+                    
+            if subnet_id:
+                router_name='ob_router'
+                try:
+                    router = get_router_from_name(user_neutron,router_name, self.get_ext_network(username).get('id'))
+                    router_id = router['router']['id']
+                    logger.info("{}Creating router".format(log_header))
+                    body_value = {
+                         'subnet_id': subnet_id,
+                    }
+                    
+                    user_neutron.add_interface_router(router=router_id, body=body_value)
+                    logger.info("{}Created router {}".format(log_header,router_id))
+                
+                except BadRequest as b:
+                    logger.info("{}router already connected".format(log_header))
+                    logger.info("{}response: {}".format(log_header,b))
             
-                router = get_router_from_name(user_neutron,router_name, self.get_ext_network(username).get('id'))
-                router_id = router['router']['id']
-                body_value = {
-                     'subnet_id': subnet["subnets"][0]['id'],
-                }
-                
-                user_neutron.add_interface_router(router=router_id, body=body_value)
-
-                logger.info("{}network successfully created and configured".format(log_header))
-                
-                
+                except Exception as e:
+                    logger.info("{}router NOT Created".format(log_header))
+                    import traceback
+                    logger.error("Error: {}".format(traceback.format_exc()))
+            
+            logger.info("{}network successfully created and configured".format(log_header))
+            
             
             new_server = user_nova.servers.create(
                 name=extended_name,
@@ -426,27 +462,58 @@ class MonitoringManager(AbstractManager):
 
 
 if __name__ == '__main__':
-    with open("/etc/softfire/openstack-credentials.json") as json_data:
+    import sys
+    #import os
+    #from os.path import expanduser
+    #abspath = os.path.abspath(__file__)
+    #dname = os.path.dirname(abspath)
+    #os.chdir(dname)
+    #home = expanduser("~")
+    #sys.path.append(os.path.join(home,"libs"))
+    sys.path.append(r"/local/monitoring-manager")
+
+    with open("/shared/softfire/compose/openstack-credentials.json") as json_data:
         openstack_credentials = json.load(json_data)
-    testbed_under_test = 'fokus'
-    project_id = "fcdaf143a95a4fada3f3fa9ee978ca8d"
+    
+    testbed_under_test = 'ericsson'
 
     auth = v3.Password(
         auth_url=openstack_credentials.get(testbed_under_test).get("auth_url"),
         username=openstack_credentials.get(testbed_under_test).get("username"),
         password=openstack_credentials.get(testbed_under_test).get("password"),
-        project_domain_name=openstack_credentials.get(testbed_under_test).get("user_domain_name"),
-        user_domain_name=openstack_credentials.get(testbed_under_test).get("user_domain_name"),
-        project_id=project_id
+        project_domain_name=openstack_credentials.get(testbed_under_test).get("project_domain_name"),
+        user_domain_id=openstack_credentials.get(testbed_under_test).get("user_domain_id"),
+        project_id=openstack_credentials.get(testbed_under_test).get("project_id")
     )
-
+    
     os_session = session.Session(auth=auth)
-
     nova = client.Client(2, session=os_session)
     neutron = nclient.Client(session=os_session)
-    print(nova.servers.list())
-    for n in neutron.list_networks()['networks']:
-        print(n)
-    print()
-    for ip in neutron.list_floatingips()['floatingips']:
-        print(ip)
+    
+    if 0:
+        print(nova.servers.list())
+        print()
+        for n in neutron.list_networks()['networks']:
+            print(n["name"])
+        print()
+        for ip in neutron.list_floatingips()['floatingips']:
+            print(ip)
+    
+    if 0:
+        print()
+        for n in neutron.list_networks()['networks']:
+            
+            if n["name"]=="softfire-internal":
+                print("{} is {}".format(n["name"],n["id"]))
+                print()
+                for s in neutron.list_subnets()["subnets"]:
+                    if s["network_id"]==n["id"]:
+                        for k,v in s.items():
+                            print ("{}:{}".format(k,v))
+                        print()    
+    if 0:
+        print()
+        for n in neutron.list_routers()['routers']:
+            print(n)
+            for k,v in n.items():
+                print ("{}:{}".format(k,v))    
