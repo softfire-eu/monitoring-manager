@@ -194,8 +194,8 @@ class MonitoringManager(AbstractManager):
 
             for s in user_neutron.list_subnets()["subnets"]:
                 if s["network_id"]==net_id:
-                    if s["name"]=="subnet_%s" % lan_name:
-                        subnet_id=s["id"]
+                    #if s["name"]=="subnet_%s" % lan_name:
+                    subnet_id=s["id"]
             
             if subnet_id==None:
                 logger.info("{}Creating subnet subnet_{}".format(log_header,lan_name))
@@ -218,8 +218,8 @@ class MonitoringManager(AbstractManager):
                     
                     for s in user_neutron.list_subnets()["subnets"]:
                         if s["network_id"]==net_id:
-                            if s["name"]=="subnet_%s" % lan_name:
-                                subnet_id=s["id"]
+                            #if s["name"]=="subnet_%s" % lan_name:
+                            subnet_id=s["id"]
                                 
                 except Exception as e:
                     logger.info("{}subnet NOT Created".format(log_header))
