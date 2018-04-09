@@ -10,6 +10,7 @@ from novaclient.exceptions import NotFound
 from sdk.softfire.manager import AbstractManager
 
 from neutronclient.common.exceptions import BadRequest
+from neutronclient.common.exceptions import IpAddressAlreadyAllocatedClient
 
 from eu.softfire.exceptions.monitoring.exceptions import *
 from eu.softfire.utils.monitoring.utils import *
@@ -241,6 +242,10 @@ class MonitoringManager(AbstractManager):
                     user_neutron.add_interface_router(router=router_id, body=body_value)
                     logger.info("{}Created router {}".format(log_header,router_id))
                 
+                except IpAddressAlreadyAllocatedClient as b:
+                    logger.info("{}router already connected".format(log_header))
+                    logger.info("{}response: {}".format(log_header,b))
+                            
                 except BadRequest as b:
                     logger.info("{}router already connected".format(log_header))
                     logger.info("{}response: {}".format(log_header,b))
